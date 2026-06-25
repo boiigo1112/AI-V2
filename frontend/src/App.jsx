@@ -7,7 +7,8 @@ import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
 import Install from './pages/Install';
 import Dashboard from './pages/Dashboard';
-import Users from './pages/Users';
+import Players from './pages/Players';
+import Characters from './pages/Characters';
 import Settings from './pages/Settings';
 
 function AnimatedPage({ children }) {
@@ -41,24 +42,11 @@ function App() {
             }
           >
             <Route path="/dashboard" element={<AnimatedPage><Dashboard /></AnimatedPage>} />
-            <Route
-              path="/users"
-              element={
-                <ProtectedRoute requiredPermission="users.read">
-                  <AnimatedPage><Users /></AnimatedPage>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute requiredPermission="settings.read">
-                  <AnimatedPage><Settings /></AnimatedPage>
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/players" element={<AnimatedPage><Players /></AnimatedPage>} />
+            <Route path="/characters" element={<AnimatedPage><Characters /></AnimatedPage>} />
+            <Route path="/settings" element={<AnimatedPage><Settings /></AnimatedPage>} />
           </Route>
-          <Route path="*" element={<Navigate to="/install" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AnimatePresence>
     </AuthProvider>

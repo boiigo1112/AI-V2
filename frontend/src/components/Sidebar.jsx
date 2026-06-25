@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, Users, Swords, Settings, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { cn } from '../lib/utils';
 
 const menuItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard.read' },
-  { path: '/users', label: 'Users', icon: Users, permission: 'users.read' },
+  { path: '/players', label: 'จัดการผู้เล่น', icon: Users, permission: 'users.read' },
+  { path: '/characters', label: 'จัดการตัวละคร', icon: Swords, permission: 'users.read' },
   { path: '/settings', label: 'Settings', icon: Settings, permission: 'settings.read' },
 ];
 

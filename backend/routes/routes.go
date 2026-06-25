@@ -36,6 +36,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	dh := handlers.NewDashboardHandler()
 	sh := handlers.NewSettingsHandler()
 	ih := handlers.NewInstallHandler()
+	gh := handlers.NewGameHandler()
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -75,6 +76,14 @@ func Setup(cfg *config.Config) *gin.Engine {
 			p.GET("/roles", middleware.RequirePermission("roles", "read"), uh.ListRoles)
 			p.PUT("/settings/profile", sh.UpdateProfile)
 			p.PUT("/settings/password", sh.ChangePassword)
+
+			p.GET("/game/users", gh.ListUsers)
+			p.GET("/game/users/:id", gh.GetUser)
+			p.GET("/game/characters", gh.ListCharacters)
+			p.GET("/game/characters/:id", gh.GetCharacter)
+			p.GET("/game/characters/user/:userNum", gh.ListCharactersByUser)
+			p.PUT("/game/characters/:id/level", gh.UpdateLevel)
+			p.PUT("/game/characters/:id/money", gh.UpdateMoney)
 		}
 	}
 

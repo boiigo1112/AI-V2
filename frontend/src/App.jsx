@@ -2,8 +2,10 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
+import Install from './pages/Install';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
@@ -28,6 +30,7 @@ function App() {
     <AuthProvider>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
+          <Route path="/install" element={<ErrorBoundary message="เกิดข้อผิดพลาดในขั้นตอนการติดตั้ง"><Install /></ErrorBoundary>} />
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route
@@ -55,6 +58,7 @@ function App() {
               }
             />
           </Route>
+          <Route path="*" element={<Navigate to="/install" replace />} />
         </Routes>
       </AnimatePresence>
     </AuthProvider>

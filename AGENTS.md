@@ -7,6 +7,9 @@
 - `security/<kebab-case>` - Security improvements
 - `chore/<kebab-case>` - Maintenance tasks
 
+## Restart Rule
+- Restart backend + frontend ทุกครั้งหลังจากมีการอัปเดตหรือเพิ่มฟังก์ชันใหม่
+
 ## Push Workflow
 1. Always ask user for confirmation before pushing to GitHub
 2. Create appropriate branch based on task type

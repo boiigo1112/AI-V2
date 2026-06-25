@@ -1,56 +1,94 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { GitCompare, ArrowRight, ArrowLeft, Check, Database, SearchX, RotateCcw } from 'lucide-react';
+import { GitCompare, ArrowRight, ArrowLeft, Check, Database, SearchX, RotateCcw, Loader2 } from 'lucide-react';
 import { installApi } from '../../services/install';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 
 const dbLabels = { RanUser: 'บัญชีผู้เล่น', RanGame1: 'ตัวละคร', RanLog: 'บันทึก', RanShop: 'ร้านค้า' };
 
+const COMPATIBLE_TYPES = {
+  varchar: ['varchar', 'nvarchar', 'char', 'nchar', 'text', 'ntext'],
+  nvarchar: ['varchar', 'nvarchar', 'char', 'nchar', 'text', 'ntext'],
+  int: ['int', 'bigint', 'smallint', 'tinyint'],
+  bigint: ['int', 'bigint'],
+  decimal: ['decimal', 'numeric', 'float', 'real', 'money'],
+  datetime: ['datetime', 'datetime2', 'date', 'smalldatetime'],
+  bit: ['bit'],
+};
+
 function normalize(s) {
   return (s || '').toLowerCase().replace(/[_\-\s]/g, '');
 }
 
-function autoMatch(columns, table, standardField) {
-  for (const col of columns) {
-    if (col.tableName !== table) continue;
-    if (normalize(col.column) === normalize(standardField)) return col.column;
-    if (normalize(col.column).includes(normalize(standardField))) return col.column;
-    if (normalize(standardField).includes(normalize(col.column))) return col.column;
+function areTypesCompatible(sourceType, targetType) {
+  if (!sourceType || !targetType) return true;
+  const s = sourceType.toLowerCase();
+  const t = targetType.toLowerCase();
+  if (s === t) return true;
+  for (const [, compatible] of Object.entries(COMPATIBLE_TYPES)) {
+    if (compatible.includes(s) && compatible.includes(t)) return true;
   }
-  for (const col of columns) {
-    if (normalize(col.column) === normalize(standardField)) return col.column;
-  }
-  return '';
+  return false;
 }
 
 function ColumnMapping({ data, onNext, onBack }) {
+  const [fetchedData, setFetchedData] = useState(null);
+  const [fetching, setFetching] = useState(() => {
+    return !(data && (data.databases || data.mappings));
+  });
+
+  useEffect(() => {
+    const hasData = data && (data.databases || data.mappings);
+    if (hasData) return;
+    setFetching(true);
+    installApi.pending()
+      .then((res) => {
+        if (res.data?.has_connection) {
+          setFetchedData(res.data);
+        }
+      })
+      .catch(() => {
+        toast.error('ไม่สามารถโหลดข้อมูลการตั้งค่า');
+      })
+      .finally(() => setFetching(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const effectiveData = fetchedData || data;
+
   const initialMappings = useMemo(() => {
     const result = {};
-    if (data?.mappings) {
-      for (const [db, maps] of Object.entries(data.mappings)) {
+    if (effectiveData?.mappings) {
+      for (const [db, maps] of Object.entries(effectiveData.mappings)) {
         if (Array.isArray(maps)) {
           result[db] = maps.map((m) => ({ ...m, actual_column: m.actual_column || '' }));
         }
       }
     }
     return result;
-  }, [data]);
+  }, [effectiveData]);
 
   const [mappings, setMappings] = useState(() => JSON.parse(JSON.stringify(initialMappings)));
   const [saving, setSaving] = useState(false);
   const [activeDB, setActiveDB] = useState('RanUser');
 
+  useEffect(() => {
+    if (initialMappings && Object.keys(initialMappings).length > 0) {
+      setMappings(JSON.parse(JSON.stringify(initialMappings)));
+    }
+  }, [initialMappings]);
+
   const dbNames = useMemo(() =>
     ['RanUser', 'RanGame1', 'RanLog', 'RanShop'].filter(
-      (n) => data?.databases?.[n]?.found
-    ), [data]
+      (n) => effectiveData?.databases?.[n]?.found
+    ), [effectiveData]
   );
 
   const allColumnOptions = useMemo(() => {
     const opts = {};
-    for (const [dbName, info] of Object.entries(data?.databases || {})) {
+    for (const [dbName, info] of Object.entries(effectiveData?.databases || {})) {
       if (!info.found) continue;
       const cols = [];
       for (const tbl of info.tables || []) {
@@ -61,10 +99,48 @@ function ColumnMapping({ data, onNext, onBack }) {
       opts[dbName] = cols;
     }
     return opts;
-  }, [data]);
+  }, [effectiveData]);
+
+  const columnsByTable = useMemo(() => {
+    const grouped = {};
+    for (const [dbName, cols] of Object.entries(allColumnOptions)) {
+      grouped[dbName] = {};
+      for (const col of cols) {
+        if (!grouped[dbName][col.tableName]) {
+          grouped[dbName][col.tableName] = [];
+        }
+        grouped[dbName][col.tableName].push(col);
+      }
+    }
+    return grouped;
+  }, [allColumnOptions]);
+
+  const tabCounts = useMemo(() => {
+    const c = {};
+    for (const db of dbNames) {
+      const dbMaps = mappings[db] || [];
+      const matched = dbMaps.filter((m) => m.actual_column).length;
+      c[db] = `${matched}/${dbMaps.length}`;
+    }
+    return c;
+  }, [mappings, dbNames]);
+
+  if (fetching) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="max-w-3xl mx-auto flex flex-col items-center justify-center py-20"
+      >
+        <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+        <p className="text-sm text-muted">กำลังโหลดข้อมูลโครงสร้างฐานข้อมูล...</p>
+      </motion.div>
+    );
+  }
 
   const currentMappings = mappings[activeDB] || [];
   const currentOptions = allColumnOptions[activeDB] || [];
+  const currentGrouped = columnsByTable[activeDB] || {};
 
   const matchedCount = currentMappings.filter((m) => m.actual_column).length;
   const totalCount = currentMappings.length;
@@ -83,11 +159,18 @@ function ColumnMapping({ data, onNext, onBack }) {
     setMappings((prev) => {
       const updated = { ...prev };
       for (const [db, maps] of Object.entries(prev)) {
-        const dbOptions = allColumnOptions[db] || [];
-        updated[db] = maps.map((m) => ({
-          ...m,
-          actual_column: m.actual_column || autoMatch(dbOptions, m.table_name, m.standard_field),
-        }));
+        const dbOpts = allColumnOptions[db] || [];
+        updated[db] = maps.map((m) => {
+          const matched = dbOpts.find(
+            (c) => c.tableName === m.table_name && normalize(c.column) === normalize(m.standard_field)
+          );
+          if (matched) return { ...m, actual_column: matched.column };
+          const partial = dbOpts.find(
+            (c) => c.tableName === m.table_name && normalize(c.column).includes(normalize(m.standard_field))
+          );
+          if (partial) return { ...m, actual_column: partial.column };
+          return m;
+        });
       }
       return updated;
     });
@@ -121,15 +204,17 @@ function ColumnMapping({ data, onNext, onBack }) {
     }
   };
 
-  const tabCounts = useMemo(() => {
-    const c = {};
-    for (const db of dbNames) {
-      c[db] = currentMappings
-        ? (mappings[db] || []).filter((m) => m.actual_column).length + '/' + (mappings[db] || []).length
-        : '0/0';
+  const getTypeWarning = (mapping) => {
+    if (!mapping.actual_column || !mapping.data_type) return null;
+    const matchedCol = currentOptions.find(
+      (c) => c.column === mapping.actual_column && c.tableName === mapping.table_name
+    );
+    if (!matchedCol) return null;
+    if (!areTypesCompatible(matchedCol.data_type, mapping.data_type)) {
+      return `⚠️ ${matchedCol.data_type} → ${mapping.data_type}`;
     }
-    return c;
-  }, [mappings, dbNames]);
+    return null;
+  };
 
   return (
     <motion.div
@@ -157,7 +242,11 @@ function ColumnMapping({ data, onNext, onBack }) {
         <Card className="p-8 text-center">
           <SearchX className="w-12 h-12 text-muted mx-auto mb-3" />
           <p className="text-muted font-medium">ไม่พบฐานข้อมูล RAN Online</p>
-          <p className="text-xs text-muted/60 mt-1">กรุณาตรวจสอบการเชื่อมต่อ MSSQL ในขั้นตอนก่อนหน้า</p>
+          <p className="text-xs text-muted/60 mt-1">
+            {effectiveData?.has_connection
+              ? 'เชื่อมต่ออยู่แต่ไม่พบฐานข้อมูลเกม ตรวจสอบว่า MSSQL มีฐานข้อมูล RanUser, RanGame1, RanLog, RanShop'
+              : 'กรุณาตรวจสอบการเชื่อมต่อ MSSQL ในขั้นตอนก่อนหน้า'}
+          </p>
           <Button variant="outline" size="sm" onClick={onBack} className="mt-4">
             <ArrowLeft className="w-4 h-4" /> กลับไปเชื่อมต่อใหม่
           </Button>
@@ -205,45 +294,64 @@ function ColumnMapping({ data, onNext, onBack }) {
                 <p className="text-muted text-center py-8">ไม่มีข้อมูลการจับคู่สำหรับฐานข้อมูลนี้</p>
               ) : (
                 currentMappings.map((m, i) => {
-                  const filtered = currentOptions.filter((c) => c.tableName === m.table_name);
-                  const allOpts = filtered.length > 0 ? filtered : currentOptions;
+                  const tableCols = currentGrouped[m.table_name] || [];
+                  const otherCols = currentOptions.filter(
+                    (c) => c.tableName !== m.table_name
+                  );
+                  const typeWarning = getTypeWarning(m);
 
                   return (
-                    <div key={i} className={`flex items-center gap-2 p-2.5 rounded-lg transition-colors ${
+                    <div key={i} className={`p-2.5 rounded-lg transition-colors ${
                       m.actual_column ? 'bg-success/5 border border-success/20' : 'bg-hover/30'
                     }`}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">
-                          {m.standard_field}
-                          {m.is_required && <span className="text-danger ml-1">*</span>}
-                        </p>
-                        <p className="text-xs text-muted">{m.table_name}</p>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-muted flex-shrink-0" />
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">
+                            {m.standard_field}
+                            {m.is_required && <span className="text-danger ml-1">*</span>}
+                          </p>
+                          <p className="text-xs text-muted">{m.table_name}</p>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-muted flex-shrink-0" />
 
-                      {allOpts.length > 0 ? (
-                        <select
-                          value={m.actual_column || ''}
-                          onChange={(e) => updateMapping(i, e.target.value)}
-                          className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary min-w-[180px] max-w-[240px]"
-                        >
-                          <option value="">— ไม่ได้จับคู่ —</option>
-                          {allOpts.map((col, ci) => (
-                            <option key={ci} value={col.column}>
-                              {col.column}
-                              {col.tableName !== m.table_name ? ` (${col.tableName})` : ''}
-                              {' — '}{col.data_type}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={m.actual_column || ''}
-                          onChange={(e) => updateMapping(i, e.target.value)}
-                          placeholder="พิมพ์ชื่อคอลัมน์..."
-                          className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary min-w-[180px]"
-                        />
+                        {(tableCols.length > 0 || otherCols.length > 0) ? (
+                          <select
+                            value={m.actual_column || ''}
+                            onChange={(e) => updateMapping(i, e.target.value)}
+                            className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary cursor-pointer min-w-[180px] max-w-[240px]"
+                          >
+                            <option value="">— ไม่ได้จับคู่ —</option>
+                            {tableCols.length > 0 && (
+                              <optgroup label={`📋 ${m.table_name} (ตารางเดียวกัน)`}>
+                                {tableCols.map((col, ci) => (
+                                  <option key={ci} value={col.column}>
+                                    {col.column} — {col.data_type}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {otherCols.length > 0 && (
+                              <optgroup label="📎 ตารางอื่น">
+                                {otherCols.map((col, ci) => (
+                                  <option key={`o-${ci}`} value={col.column}>
+                                    {col.column} ({col.tableName}) — {col.data_type}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={m.actual_column || ''}
+                            onChange={(e) => updateMapping(i, e.target.value)}
+                            placeholder="พิมพ์ชื่อคอลัมน์..."
+                            className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary min-w-[180px]"
+                          />
+                        )}
+                      </div>
+                      {typeWarning && (
+                        <p className="text-xs text-warning mt-1 ml-6">{typeWarning}</p>
                       )}
                     </div>
                   );

@@ -35,7 +35,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	uh := handlers.NewUserHandler(userSvc)
 	dh := handlers.NewDashboardHandler()
 	sh := handlers.NewSettingsHandler()
-	ih := handlers.NewInstallHandler()
+	ih := handlers.NewInstallHandler(cfg.JWTSecret)
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -48,6 +48,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		install := api.Group("/install")
 		{
 			install.GET("/status", ih.Status)
+			install.GET("/pending", ih.PendingScan)
 			install.POST("/connect", ih.ConnectGameDB)
 			install.POST("/mappings", ih.SaveMappings)
 			install.POST("/complete", ih.CompleteInstall)

@@ -505,3 +505,148 @@ func (s *GameService) GetTableColumns(dbName, tableName string) ([]map[string]in
 	}
 	return cols, nil
 }
+
+func (s *GameService) BlockPlayer(tableName, usernum, reason string) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	userNumCol, _ := s.GetActualColumn(tableName, "UserNum")
+	if userNumCol == "" {
+		userNumCol = "UserNum"
+	}
+
+	query := fmt.Sprintf("SELECT TOP 1 [%s] FROM [RanUser]..[%s] WHERE [%s] = '%v'", userNumCol, tableName, userNumCol, usernum)
+	var checkVal string
+	if err := gdb.DB.QueryRow(query).Scan(&checkVal); err != nil {
+		return fmt.Errorf("player not found")
+	}
+
+	insertQuery := fmt.Sprintf("INSERT INTO [RanUser]..[BlockAddress] ([BlockAddress], [BlockReason], [BlockDate]) VALUES ('%s', '%s', GETDATE())", usernum, reason)
+	_, err := gdb.DB.Exec(insertQuery)
+	return err
+}
+
+func (s *GameService) UnblockPlayer(tableName, usernum string) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	userNumCol, _ := s.GetActualColumn(tableName, "UserNum")
+	if userNumCol == "" {
+		userNumCol = "UserNum"
+	}
+
+	query := fmt.Sprintf("SELECT TOP 1 [%s] FROM [RanUser]..[%s] WHERE [%s] = '%v'", userNumCol, tableName, userNumCol, usernum)
+	var checkVal string
+	if err := gdb.DB.QueryRow(query).Scan(&checkVal); err != nil {
+		return fmt.Errorf("player not found")
+	}
+
+	return nil
+}
+
+func (s *GameService) UpdateCharacter(chanum string, field string, value interface{}) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	allowedFields := map[string]bool{
+		"ChaLevel": true, "ChaMoney": true, "ChaExp": true,
+		"ChaPower": true, "ChaDex": true, "ChaSpirit": true,
+		"ChaStrong": true, "ChaIntel": true, "ChaReborn": true,
+	}
+	if !allowedFields[field] {
+		return fmt.Errorf("field '%s' is not editable", field)
+	}
+
+	query := fmt.Sprintf("UPDATE [RanGame1]..[ChaInfo] SET [%s] = '%v' WHERE ChaNum = '%s'", field, value, chanum)
+	result, err := gdb.DB.Exec(query)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("character not found")
+	}
+	return nil
+}
+
+func (s *GameService) ListShopItems(tableName string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	tableRef := fmt.Sprintf("[RanShop]..[%s]", tableName)
+
+	var total int
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableRef)
+	if err := gdb.DB.QueryRow(countQuery).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	dataQuery := fmt.Sprintf("SELECT * FROM %s ORDER BY 1 OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", tableRef, offset, limit)
+	rows, err := gdb.DB.Query(dataQuery)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	columns, _ := rows.Columns()
+	var results []map[string]interface{}
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+		if err := rows.Scan(valuePtrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range columns {
+			val := values[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
+func (s *GameService) Reconnect(host string, port int, username, password string) error {
+	gdb, err := gamedatabase.Connect(gamedatabase.GameDBConnection{
+		ID:       "reconnect-" + host,
+		Host:     host,
+		Port:     port,
+		Database: "master",
+		Username: username,
+		Password: password,
+	})
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	if s.gameDB != nil {
+		s.gameDB.DB.Close()
+	}
+	s.gameDB = gdb
+	s.mu.Unlock()
+
+	database.DB.Exec(`UPDATE game_connections SET is_connected = true, host = $1, port = $2, username = $3 WHERE is_connected = true`, host, port, username)
+
+	encryptedPass, encErr := gamedatabase.EncryptPassword(password, s.cfg.JWTSecret)
+	if encErr == nil {
+		database.DB.Exec(`UPDATE game_connections SET password = $1 WHERE is_connected = true`, encryptedPass)
+	}
+
+	return nil
+}

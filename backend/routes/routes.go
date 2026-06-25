@@ -82,12 +82,18 @@ func Setup(cfg *config.Config) *gin.Engine {
 			game := p.Group("/game")
 			{
 				game.GET("/status", gh.Status)
+				game.POST("/reconnect", gh.Reconnect)
 				game.GET("/databases", gh.ListDatabases)
 				game.GET("/databases/:db/tables", gh.ListTables)
+				game.GET("/databases/:db/tables/all", gh.ListAllTables)
 				game.GET("/databases/:db/tables/:table/columns", gh.GetTableColumns)
 				game.GET("/players", gh.ListPlayers)
 				game.GET("/players/:id", gh.GetPlayer)
 				game.GET("/players/:id/characters", gh.GetPlayerCharacters)
+				game.POST("/players/:id/block", gh.BlockPlayer)
+				game.POST("/players/:id/unblock", gh.UnblockPlayer)
+				game.PUT("/characters/:id", gh.UpdateCharacter)
+				game.GET("/shop", gh.ListShopItems)
 				game.GET("/logs/:db", gh.ListLogs)
 			}
 		}

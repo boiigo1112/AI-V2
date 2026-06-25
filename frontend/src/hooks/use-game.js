@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 
 export function useGameStatus() {
@@ -7,6 +7,14 @@ export function useGameStatus() {
     queryFn: () => api.get('/game/status').then(r => r.data),
     staleTime: 10_000,
     refetchInterval: 30_000,
+  });
+}
+
+export function useGameReconnect() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/reconnect', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'status'] }),
   });
 }
 
@@ -22,6 +30,15 @@ export function useGameTables(dbName) {
   return useQuery({
     queryKey: ['game', 'tables', dbName],
     queryFn: () => api.get(`/game/databases/${dbName}/tables`).then(r => r.data.tables || []),
+    staleTime: 60_000,
+    enabled: !!dbName,
+  });
+}
+
+export function useGameAllTables(dbName) {
+  return useQuery({
+    queryKey: ['game', 'allTables', dbName],
+    queryFn: () => api.get(`/game/databases/${dbName}/tables/all`).then(r => r.data.tables || []),
     staleTime: 60_000,
     enabled: !!dbName,
   });
@@ -60,6 +77,39 @@ export function useGamePlayerCharacters(id) {
     queryFn: () => api.get(`/game/players/${id}/characters`).then(r => r.data.characters || []),
     staleTime: 30_000,
     enabled: !!id,
+  });
+}
+
+export function useBlockPlayer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }) => api.post(`/game/players/${id}/block`, { reason }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'players'] }),
+  });
+}
+
+export function useUnblockPlayer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.post(`/game/players/${id}/unblock`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'players'] }),
+  });
+}
+
+export function useUpdateCharacter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, field, value }) => api.put(`/game/characters/${id}`, { field, value }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'player'] }),
+  });
+}
+
+export function useGameShopItems(params = {}) {
+  const { table = 'GameItemShop', limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'shop', table, limit, offset],
+    queryFn: () => api.get('/game/shop', { params: { table, limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
   });
 }
 

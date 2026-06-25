@@ -35,6 +35,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	uh := handlers.NewUserHandler(userSvc)
 	dh := handlers.NewDashboardHandler()
 	sh := handlers.NewSettingsHandler()
+	ih := handlers.NewInstallHandler()
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -43,6 +44,15 @@ func Setup(cfg *config.Config) *gin.Engine {
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
+
+		install := api.Group("/install")
+		{
+			install.GET("/status", ih.Status)
+			install.POST("/connect", ih.ConnectGameDB)
+			install.POST("/mappings", ih.SaveMappings)
+			install.POST("/complete", ih.CompleteInstall)
+			install.POST("/reset", ih.ResetInstall)
+		}
 
 		api.POST("/auth/login", middleware.RateLimit(loginLimiter), ah.Login)
 		api.GET("/auth/google", ah.GoogleLogin)

@@ -34,3 +34,4 @@ postgres-data/
 # Logs
 *.log
 /tmp/
+backend/blacken-server

@@ -60,6 +60,15 @@ func sanitizeDBName(name string) string {
 	}, name)
 }
 
+func sanitizeTableName(name string) string {
+	return strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == ' ' {
+			return r
+		}
+		return -1
+	}, name)
+}
+
 func (gd *GameDB) ScanTablesDirect(dbName string) ([]GameDBTable, error) {
 	safe := sanitizeDBName(dbName)
 	query := fmt.Sprintf(`
@@ -92,24 +101,32 @@ func (gd *GameDB) ScanTablesDirect(dbName string) ([]GameDBTable, error) {
 
 func (gd *GameDB) ScanColumnsDirect(dbName, tableName string) ([]GameDBColumn, error) {
 	safeDB := sanitizeDBName(dbName)
+	safeTable := sanitizeTableName(tableName)
+	if safeDB == "" || safeTable == "" {
+		return nil, fmt.Errorf("invalid db or table name: %s.%s", dbName, tableName)
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
-			c.TABLE_CATALOG,
-			c.TABLE_NAME,
-			c.COLUMN_NAME,
-			c.DATA_TYPE,
-			ISNULL(c.CHARACTER_MAXIMUM_LENGTH, 0),
-			c.IS_NULLABLE,
-			ISNULL(c.COLUMN_DEFAULT, '')
-		FROM [%s].INFORMATION_SCHEMA.COLUMNS c
-		WHERE c.TABLE_NAME = @p1
-		ORDER BY c.ORDINAL_POSITION
-	`, safeDB)
+			DB_NAME() AS TABLE_CATALOG,
+			t.name AS TABLE_NAME,
+			c.name AS COLUMN_NAME,
+			ty.name AS DATA_TYPE,
+			CASE WHEN c.max_length = -1 THEN 0 ELSE c.max_length END AS MAX_LENGTH,
+			CASE WHEN c.is_nullable = 1 THEN 'YES' ELSE 'NO' END AS IS_NULLABLE,
+			ISNULL(dc.definition, '') AS DEFAULT_VAL
+		FROM [%s].sys.columns c
+		INNER JOIN [%s].sys.tables t ON c.object_id = t.object_id
+		INNER JOIN [%s].sys.types ty ON c.user_type_id = ty.user_type_id
+		LEFT JOIN [%s].sys.default_constraints dc ON c.default_object_id = dc.object_id
+		WHERE t.name = '%s'
+		ORDER BY c.column_id
+	`, safeDB, safeDB, safeDB, safeDB, safeTable)
 
-	log.Printf("[gamedb] Scanning columns: [%s]..[%s]", safeDB, tableName)
-	rows, err := gd.DB.Query(query, tableName)
+	log.Printf("[gamedb] Scanning columns: [%s]..[%s]", safeDB, safeTable)
+	rows, err := gd.DB.Query(query)
 	if err != nil {
-		log.Printf("[gamedb] ScanColumns error: %v", err)
+		log.Printf("[gamedb] ScanColumns query error for [%s]..[%s]: %v", safeDB, safeTable, err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -123,21 +140,86 @@ func (gd *GameDB) ScanColumnsDirect(dbName, tableName string) ([]GameDBColumn, e
 			&col.Catalog, &col.Table, &col.Column, &col.DataType,
 			&maxLen, &nullable, &col.DefaultVal,
 		); err != nil {
-			log.Printf("[gamedb] ScanColumns row error: %v", err)
+			log.Printf("[gamedb] ScanColumns row scan error for [%s]..[%s]: %v", safeDB, safeTable, err)
 			continue
 		}
 		col.MaxLength = &maxLen
 		col.IsNullable = nullable == "YES"
 		cols = append(cols, col)
 	}
-	log.Printf("[gamedb] Found %d columns in [%s]..[%s]", len(cols), safeDB, tableName)
+	if err := rows.Err(); err != nil {
+		log.Printf("[gamedb] ScanColumns rows iteration error for [%s]..[%s]: %v", safeDB, safeTable, err)
+	}
+	log.Printf("[gamedb] Found %d columns in [%s]..[%s]", len(cols), safeDB, safeTable)
 	return cols, nil
 }
 
+func (gd *GameDB) ScanColumnsFallback(dbName, tableName string) ([]GameDBColumn, error) {
+	safeDB := sanitizeDBName(dbName)
+	safeTable := sanitizeTableName(tableName)
+	if safeDB == "" || safeTable == "" {
+		return nil, fmt.Errorf("invalid db or table name: %s.%s", dbName, tableName)
+	}
+
+	query := fmt.Sprintf("SELECT TOP 1 * FROM [%s].[%s]", safeDB, safeTable)
+	log.Printf("[gamedb] Fallback column scan: [%s]..[%s]", safeDB, safeTable)
+
+	rows, err := gd.DB.Query(query)
+	if err != nil {
+		log.Printf("[gamedb] Fallback scan error for [%s]..[%s]: %v", safeDB, safeTable, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		log.Printf("[gamedb] ColumnTypes error for [%s]..[%s]: %v", safeDB, safeTable, err)
+		return nil, err
+	}
+
+	var cols []GameDBColumn
+	for _, ct := range colTypes {
+		nullable, _ := ct.Nullable()
+		defaultVal := ""
+		col := GameDBColumn{
+			Catalog:    safeDB,
+			Table:      safeTable,
+			Column:     ct.Name(),
+			DataType:   ct.DatabaseTypeName(),
+			IsNullable: nullable,
+			DefaultVal: defaultVal,
+		}
+		if col.DataType == "" {
+			col.DataType = "unknown"
+		}
+		maxLen := 0
+		if length, ok := ct.Length(); ok {
+			maxLen = int(length)
+		}
+		col.MaxLength = &maxLen
+		cols = append(cols, col)
+	}
+	log.Printf("[gamedb] Fallback found %d columns in [%s]..[%s]", len(cols), safeDB, safeTable)
+	return cols, nil
+}
+
+func (gd *GameDB) TestQuery(dbName, tableName string) (int, error) {
+	safeDB := sanitizeDBName(dbName)
+	safeTable := sanitizeTableName(tableName)
+	query := fmt.Sprintf("SELECT COUNT(*) FROM [%s].[%s]", safeDB, safeTable)
+
+	var count int
+	err := gd.DB.QueryRow(query).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 type DbScanResult struct {
-	DBName  string                     `json:"db_name"`
-	Tables  []GameDBTable              `json:"tables"`
-	Columns map[string][]GameDBColumn  `json:"columns"`
+	DBName  string                    `json:"db_name"`
+	Tables  []GameDBTable             `json:"tables"`
+	Columns map[string][]GameDBColumn `json:"columns"`
 }
 
 func (gd *GameDB) ScanAllGameDatabases() (map[string]DbScanResult, error) {
@@ -158,15 +240,23 @@ func (gd *GameDB) ScanAllGameDatabases() (map[string]DbScanResult, error) {
 			continue
 		}
 
+		bulkCols := ScanAllColumnsForTable(gd, dbName)
+
 		cols := make(map[string][]GameDBColumn)
 		for _, t := range tables {
+			if bulkCols != nil {
+				if c, ok := bulkCols[t.Table]; ok && len(c) > 0 {
+					cols[t.Table] = c
+					continue
+				}
+			}
 			columns, err := gd.ScanColumnsDirect(dbName, t.Table)
 			if err != nil {
-				log.Printf("[gamedb] Failed to scan columns for %s.%s: %v", dbName, t.Table, err)
-				continue
-			}
-			if len(columns) == 0 {
-				log.Printf("[gamedb] WARNING: 0 columns for %s.%s", dbName, t.Table)
+				log.Printf("[gamedb] Primary scan failed for %s.%s: %v — trying fallback", dbName, t.Table, err)
+				columns, err = gd.ScanColumnsFallback(dbName, t.Table)
+				if err != nil {
+					log.Printf("[gamedb] Fallback scan also failed for %s.%s: %v", dbName, t.Table, err)
+				}
 			}
 			cols[t.Table] = columns
 		}
@@ -189,4 +279,70 @@ func (gd *GameDB) ScanAllGameDatabases() (map[string]DbScanResult, error) {
 
 func (gd *GameDB) TestConnection() error {
 	return gd.DB.Ping()
+}
+
+func ScanColumnsWithFallback(gd *GameDB, dbName, tableName string) []GameDBColumn {
+	columns, err := gd.ScanColumnsDirect(dbName, tableName)
+	if err == nil && len(columns) > 0 {
+		return columns
+	}
+
+	log.Printf("[gamedb] Trying fallback for %s.%s", dbName, tableName)
+	columns, err = gd.ScanColumnsFallback(dbName, tableName)
+	if err == nil && len(columns) > 0 {
+		return columns
+	}
+
+	return []GameDBColumn{}
+}
+
+func ScanAllColumnsForTable(gd *GameDB, dbName string) map[string][]GameDBColumn {
+	safeDB := sanitizeDBName(dbName)
+	query := fmt.Sprintf(`
+		SELECT
+			DB_NAME() AS TABLE_CATALOG,
+			t.name AS TABLE_NAME,
+			c.name AS COLUMN_NAME,
+			ty.name AS DATA_TYPE,
+			CASE WHEN c.max_length = -1 THEN 0 ELSE c.max_length END AS MAX_LENGTH,
+			CASE WHEN c.is_nullable = 1 THEN 'YES' ELSE 'NO' END AS IS_NULLABLE,
+			ISNULL(dc.definition, '') AS DEFAULT_VAL
+		FROM [%s].sys.columns c
+		INNER JOIN [%s].sys.tables t ON c.object_id = t.object_id
+		INNER JOIN [%s].sys.types ty ON c.user_type_id = ty.user_type_id
+		LEFT JOIN [%s].sys.default_constraints dc ON c.default_object_id = dc.object_id
+		ORDER BY t.name, c.column_id
+	`, safeDB, safeDB, safeDB, safeDB)
+
+	log.Printf("[gamedb] Bulk scanning all columns in [%s]", safeDB)
+	rows, err := gd.DB.Query(query)
+	if err != nil {
+		log.Printf("[gamedb] Bulk column scan error for [%s]: %v", safeDB, err)
+		return nil
+	}
+	defer rows.Close()
+
+	result := make(map[string][]GameDBColumn)
+	for rows.Next() {
+		var col GameDBColumn
+		var maxLen int
+		var nullable string
+		if err := rows.Scan(
+			&col.Catalog, &col.Table, &col.Column, &col.DataType,
+			&maxLen, &nullable, &col.DefaultVal,
+		); err != nil {
+			log.Printf("[gamedb] Bulk scan row error: %v", err)
+			continue
+		}
+		col.MaxLength = &maxLen
+		col.IsNullable = nullable == "YES"
+		result[col.Table] = append(result[col.Table], col)
+	}
+
+	total := 0
+	for _, v := range result {
+		total += len(v)
+	}
+	log.Printf("[gamedb] Bulk scan found %d columns across %d tables in [%s]", total, len(result), safeDB)
+	return result
 }

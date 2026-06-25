@@ -1,14 +1,61 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, ArrowRight, XCircle } from 'lucide-react';
+import { CheckCircle, ArrowRight, XCircle, GitCompare } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 
 const dbLabels = { RanUser: 'บัญชีผู้เล่น', RanGame1: 'ตัวละคร', RanLog: 'บันทึก', RanShop: 'ร้านค้า' };
 
 function Complete({ data }) {
   const navigate = useNavigate();
-  const dbs = data?.databases || {};
+
+  if (!data) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center max-w-lg mx-auto"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+        >
+          <div className="w-24 h-24 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-12 h-12 text-success" />
+          </div>
+        </motion.div>
+
+        <h1 className="text-3xl font-bold mb-3">ติดตั้งเสร็จสมบูรณ์!</h1>
+        <p className="text-muted mb-6">
+          ระบบ Black En Admin Panel พร้อมใช้งานแล้ว
+        </p>
+
+        <div className="bg-card/50 rounded-xl p-4 border border-border mb-8 text-left text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted">ระบบ Admin</span>
+            <span className="text-success">พร้อมใช้งาน</span>
+          </div>
+        </div>
+
+        <Button size="lg" onClick={() => navigate('/login')}>
+          ไปยังหน้าเข้าสู่ระบบ
+          <ArrowRight className="w-4 h-4" />
+        </Button>
+      </motion.div>
+    );
+  }
+
+  const dbs = data.databases || {};
+  const mappings = data.mappings || {};
   const connected = Object.values(dbs).filter((d) => d.found).length;
+
+  const mappingSummary = Object.entries(mappings).map(([dbName, maps]) => {
+    const matched = Array.isArray(maps) ? maps.filter((m) => m.actual_column).length : 0;
+    const total = Array.isArray(maps) ? maps.length : 0;
+    const required = Array.isArray(maps) ? maps.filter((m) => m.is_required).length : 0;
+    const requiredMatched = Array.isArray(maps) ? maps.filter((m) => m.is_required && m.actual_column).length : 0;
+    return { dbName, matched, total, required, requiredMatched };
+  });
 
   return (
     <motion.div
@@ -31,7 +78,7 @@ function Complete({ data }) {
         ระบบ Black En Admin Panel พร้อมใช้งานแล้ว
       </p>
 
-      <div className="bg-card/50 rounded-xl p-4 border border-border mb-8 text-left text-sm space-y-2">
+      <div className="bg-card/50 rounded-xl p-4 border border-border mb-4 text-left text-sm space-y-2">
         <div className="flex justify-between">
           <span className="text-muted">ระบบ Admin</span>
           <span className="text-success">พร้อมใช้งาน</span>
@@ -59,6 +106,32 @@ function Complete({ data }) {
           ))}
         </div>
       </div>
+
+      {mappingSummary.length > 0 && (
+        <div className="bg-card/50 rounded-xl p-4 border border-border mb-8 text-left text-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <GitCompare className="w-4 h-4 text-primary" />
+            <span className="font-medium">สรุปการจับคู่คอลัมน์</span>
+          </div>
+          <div className="space-y-2">
+            {mappingSummary.map(({ dbName, matched, total, required, requiredMatched }) => (
+              <div key={dbName} className="flex items-center justify-between text-xs">
+                <span className="text-muted">{dbName}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-muted">
+                    {matched}/{total} ฟิลด์
+                  </span>
+                  {required > 0 && (
+                    <span className={requiredMatched === required ? 'text-success' : 'text-warning'}>
+                      บังคับ {requiredMatched}/{required}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Button size="lg" onClick={() => navigate('/login')}>
         ไปยังหน้าเข้าสู่ระบบ

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Navigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { installApi } from '../services/install';
 import Welcome from './Install/Welcome';
 import DatabaseConnect from './Install/DatabaseConnect';
@@ -14,26 +15,55 @@ function InstallWizard() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [scanData, setScanData] = useState(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
 
   useEffect(() => {
     installApi.status()
       .then((res) => {
         if (res.data.installed) {
           setStep(steps.length);
+          setLoading(false);
+          return;
         }
+
+        if (res.data.step > 0) {
+          setStep(Math.min(res.data.step, steps.length - 1));
+          if (res.data.step >= 2) {
+            setResumeLoading(true);
+            installApi.pending()
+              .then((r) => {
+                if (r.data.has_connection) {
+                  setScanData(r.data);
+                }
+              })
+              .catch((err) => {
+                toast.error(err.response?.data?.error || 'ไม่สามารถโหลดข้อมูลการตั้งค่า');
+              })
+              .finally(() => {
+                setLoading(false);
+                setResumeLoading(false);
+              });
+            return;
+          }
+        }
+        setLoading(false);
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => {
+        setLoading(false);
+      });
   }, []);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           className="w-8 h-8 border-2 border-border border-t-primary rounded-full"
         />
+        {resumeLoading && (
+          <p className="text-sm text-muted">กำลังโหลดข้อมูลการตั้งค่า...</p>
+        )}
       </div>
     );
   }
@@ -49,6 +79,7 @@ function InstallWizard() {
       case 1:
         return (
           <DatabaseConnect
+            initialData={scanData}
             onNext={(data) => { setScanData(data); setStep(2); }}
             onBack={() => setStep(0)}
           />
@@ -75,7 +106,6 @@ function InstallWizard() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-[#0a0a1a] via-[#0f0f23] to-[#0a0a2e]">
-      {/* Step indicator */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="max-w-3xl mx-auto flex items-center justify-between px-6 py-3">
           {steps.slice(0, -1).map((s, i) => (

@@ -9,6 +9,8 @@ import Install from './pages/Install';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Players from './pages/Players';
+import Logs from './pages/Logs';
 
 function AnimatedPage({ children }) {
   return (
@@ -57,6 +59,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/game/players" element={<AnimatedPage><Players /></AnimatedPage>} />
+            <Route path="/game/logs" element={<AnimatedPage><Logs /></AnimatedPage>} />
           </Route>
           <Route path="*" element={<Navigate to="/install" replace />} />
         </Routes>

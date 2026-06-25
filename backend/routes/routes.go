@@ -30,12 +30,14 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	authSvc := services.NewAuthService(cfg)
 	userSvc := services.NewUserService()
+	gameSvc := services.NewGameService(cfg.JWTSecret)
 
 	ah := handlers.NewAuthHandler(authSvc, cfg)
 	uh := handlers.NewUserHandler(userSvc)
 	dh := handlers.NewDashboardHandler()
 	sh := handlers.NewSettingsHandler()
 	ih := handlers.NewInstallHandler(cfg.JWTSecret)
+	gh := handlers.NewGameHandler(gameSvc)
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -76,6 +78,18 @@ func Setup(cfg *config.Config) *gin.Engine {
 			p.GET("/roles", middleware.RequirePermission("roles", "read"), uh.ListRoles)
 			p.PUT("/settings/profile", sh.UpdateProfile)
 			p.PUT("/settings/password", sh.ChangePassword)
+
+			game := p.Group("/game")
+			{
+				game.GET("/status", gh.Status)
+				game.GET("/databases", gh.ListDatabases)
+				game.GET("/databases/:db/tables", gh.ListTables)
+				game.GET("/databases/:db/tables/:table/columns", gh.GetTableColumns)
+				game.GET("/players", gh.ListPlayers)
+				game.GET("/players/:id", gh.GetPlayer)
+				game.GET("/players/:id/characters", gh.GetPlayerCharacters)
+				game.GET("/logs/:db", gh.ListLogs)
+			}
 		}
 	}
 

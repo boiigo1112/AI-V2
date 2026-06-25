@@ -40,7 +40,7 @@ func (gd *GameDB) FindGameDatabases() ([]string, error) {
 }
 
 func (gd *GameDB) SwitchDB(dbName string) error {
-	safe := sanitizeDBName(dbName)
+	safe := SanitizeDBName(dbName)
 	if safe == "" {
 		return fmt.Errorf("invalid database name: %s", dbName)
 	}
@@ -51,7 +51,7 @@ func (gd *GameDB) SwitchDB(dbName string) error {
 	return err
 }
 
-func sanitizeDBName(name string) string {
+func SanitizeDBName(name string) string {
 	return strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
 			return r
@@ -60,7 +60,7 @@ func sanitizeDBName(name string) string {
 	}, name)
 }
 
-func sanitizeTableName(name string) string {
+func SanitizeTableName(name string) string {
 	return strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == ' ' {
 			return r
@@ -70,7 +70,7 @@ func sanitizeTableName(name string) string {
 }
 
 func (gd *GameDB) ScanTablesDirect(dbName string) ([]GameDBTable, error) {
-	safe := sanitizeDBName(dbName)
+	safe := SanitizeDBName(dbName)
 	query := fmt.Sprintf(`
 		SELECT TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
 		FROM [%s].INFORMATION_SCHEMA.TABLES
@@ -100,8 +100,8 @@ func (gd *GameDB) ScanTablesDirect(dbName string) ([]GameDBTable, error) {
 }
 
 func (gd *GameDB) ScanColumnsDirect(dbName, tableName string) ([]GameDBColumn, error) {
-	safeDB := sanitizeDBName(dbName)
-	safeTable := sanitizeTableName(tableName)
+	safeDB := SanitizeDBName(dbName)
+	safeTable := SanitizeTableName(tableName)
 	if safeDB == "" || safeTable == "" {
 		return nil, fmt.Errorf("invalid db or table name: %s.%s", dbName, tableName)
 	}
@@ -155,8 +155,8 @@ func (gd *GameDB) ScanColumnsDirect(dbName, tableName string) ([]GameDBColumn, e
 }
 
 func (gd *GameDB) ScanColumnsFallback(dbName, tableName string) ([]GameDBColumn, error) {
-	safeDB := sanitizeDBName(dbName)
-	safeTable := sanitizeTableName(tableName)
+	safeDB := SanitizeDBName(dbName)
+	safeTable := SanitizeTableName(tableName)
 	if safeDB == "" || safeTable == "" {
 		return nil, fmt.Errorf("invalid db or table name: %s.%s", dbName, tableName)
 	}
@@ -204,8 +204,8 @@ func (gd *GameDB) ScanColumnsFallback(dbName, tableName string) ([]GameDBColumn,
 }
 
 func (gd *GameDB) TestQuery(dbName, tableName string) (int, error) {
-	safeDB := sanitizeDBName(dbName)
-	safeTable := sanitizeTableName(tableName)
+	safeDB := SanitizeDBName(dbName)
+	safeTable := SanitizeTableName(tableName)
 	query := fmt.Sprintf("SELECT COUNT(*) FROM [%s].[%s]", safeDB, safeTable)
 
 	var count int
@@ -297,7 +297,7 @@ func ScanColumnsWithFallback(gd *GameDB, dbName, tableName string) []GameDBColum
 }
 
 func ScanAllColumnsForTable(gd *GameDB, dbName string) map[string][]GameDBColumn {
-	safeDB := sanitizeDBName(dbName)
+	safeDB := SanitizeDBName(dbName)
 	query := fmt.Sprintf(`
 		SELECT
 			DB_NAME() AS TABLE_CATALOG,

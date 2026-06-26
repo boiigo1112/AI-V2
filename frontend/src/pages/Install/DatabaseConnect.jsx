@@ -6,9 +6,9 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Database, ArrowRight, ArrowLeft, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { installApi } from '../../services/install';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Card } from '../../components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
 
 const schema = z.object({
   host: z.string().min(1, 'กรุณากรอก Host'),

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Server, ArrowRight } from 'lucide-react';
-import { Button } from '../../components/ui/button';
+import { Button } from '@/components/ui/button';
 
 function Welcome({ onNext }) {
   return (

@@ -6,9 +6,9 @@ import { toast } from 'sonner';
 import { Settings as SettingsIcon, Key, User, Shield } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Card, CardContent, CardHeader } from '../components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 const profileSchema = z.object({
   full_name: z.string().optional(),

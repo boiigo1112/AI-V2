@@ -5,9 +5,9 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { UserCog, ArrowLeft, Shield } from 'lucide-react';
 import { installApi } from '../../services/install';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Card } from '../../components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
 
 const schema = z.object({
   username: z.string().min(4, 'ชื่อผู้ใช้ต้องมีอย่างน้อย 4 ตัวอักษร'),

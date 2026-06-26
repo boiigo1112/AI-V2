@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { GitCompare, ArrowRight, ArrowLeft, Check, Database, SearchX, RotateCcw } from 'lucide-react';
 import { installApi } from '../../services/install';
-import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 const dbLabels = { RanUser: 'บัญชีผู้เล่น', RanGame1: 'ตัวละคร', RanLog: 'บันทึก', RanShop: 'ร้านค้า' };
 

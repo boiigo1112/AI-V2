@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { motion, useAnimation } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Lock, User, LogIn, Zap } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, LogIn, Zap, Shield } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const schema = z.object({
@@ -22,38 +22,25 @@ function FloatingShape({ delay, duration, x, y, size, color }) {
       animate={{
         x: [0, x, 0],
         y: [0, y, 0],
-        opacity: [0.15, 0.3, 0.15],
+        opacity: [0.12, 0.25, 0.12],
       }}
-      transition={{
-        duration,
-        delay,
-        repeat: Infinity,
-        ease: 'easeInOut',
-      }}
+      transition={{ duration, delay, repeat: Infinity, ease: 'easeInOut' }}
     />
   );
 }
 
 function Particle({ index }) {
-  const random = useCallback((min, max) => Math.random() * (max - min) + min, []);
+  const random = (min, max) => {
+    const seed = (index * 137 + 47) % 1000;
+    return min + (seed / 1000) * (max - min);
+  };
 
   return (
     <motion.div
-      className="absolute w-1 h-1 rounded-full bg-white/20 pointer-events-none"
-      style={{
-        left: `${random(0, 100)}%`,
-        top: `${random(0, 100)}%`,
-      }}
-      animate={{
-        y: [0, -30, 0],
-        opacity: [0, 1, 0],
-      }}
-      transition={{
-        duration: random(3, 6),
-        delay: random(0, 3),
-        repeat: Infinity,
-        ease: 'easeInOut',
-      }}
+      className="absolute w-[2px] h-[2px] rounded-full bg-gold/30 pointer-events-none"
+      style={{ left: `${random(0, 100)}%`, top: `${random(0, 100)}%` }}
+      animate={{ y: [0, -25, 0], opacity: [0, 0.6, 0] }}
+      transition={{ duration: random(4, 7), delay: random(0, 4), repeat: Infinity, ease: 'easeInOut' }}
     />
   );
 }
@@ -61,7 +48,6 @@ function Particle({ index }) {
 function Login() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const controls = useAnimation();
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -71,8 +57,9 @@ function Login() {
   } = useForm({ resolver: zodResolver(schema) });
 
   useEffect(() => {
-    controls.start({ opacity: 1, y: 0 });
-  }, [controls]);
+    const timer = setTimeout(() => {}, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (user) return <Navigate to="/dashboard" replace />;
 
@@ -87,169 +74,189 @@ function Login() {
       const msg = err.response?.status === 429
         ? 'ลองอีกครั้งในภายหลัง'
         : 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
-      toast.error('เข้าสู่ระบบไม่สำเร็จ', {
-        description: msg,
-      });
+      toast.error('เข้าสู่ระบบไม่สำเร็จ', { description: msg });
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-[#0a0a1a] via-[#0f0f23] to-[#0a0a2e]">
-      {/* Animated Background */}
-      <FloatingShape delay={0} duration={8} x={100} y={-100} size={500} color="rgba(74,74,255,0.12)" />
-      <FloatingShape delay={2} duration={10} x={-80} y={120} size={400} color="rgba(139,92,246,0.08)" />
-      <FloatingShape delay={4} duration={7} x={60} y={80} size={300} color="rgba(59,130,246,0.06)" />
+  const inputClass = (hasError) => `
+    w-full h-11 pl-11 pr-4 rounded-lg text-sm text-foreground
+    bg-white/[0.05] border transition-all duration-200
+    placeholder:text-white/30
+    ${hasError
+      ? 'border-red-500/50 focus:border-red-400 focus:ring-2 focus:ring-red-400/20'
+      : 'border-white/[0.08] focus:border-gold/60 focus:ring-2 focus:ring-gold/15'
+    }
+    hover:bg-white/[0.07] hover:border-white/[0.12]
+  `;
 
-      {/* Particles */}
-      {Array.from({ length: 20 }).map((_, i) => (
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#08080e]">
+      <FloatingShape delay={0} duration={10} x={80} y={-80} size={500} color="rgba(201,168,76,0.06)" />
+      <FloatingShape delay={3} duration={12} x={-60} y={100} size={400} color="rgba(59,130,246,0.04)" />
+      <FloatingShape delay={5} duration={8} x={50} y={60} size={300} color="rgba(124,92,224,0.03)" />
+
+      {Array.from({ length: 12 }).map((_, i) => (
         <Particle key={i} index={i} />
       ))}
-
-      {/* Grid overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
-        }}
-      />
 
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-md relative z-10"
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-[400px] relative z-10"
       >
-        {/* Card with glass effect */}
-        <div className="relative backdrop-blur-xl bg-white/[0.03] rounded-3xl p-10 shadow-2xl shadow-black/50 border border-white/[0.06]">
-          {/* Subtle gradient border */}
+        <div className="relative backdrop-blur-xl bg-white/[0.04] rounded-2xl p-8 shadow-[0_0_40px_rgba(0,0,0,0.4)] border border-white/[0.06]">
           <div
-            className="absolute inset-0 rounded-3xl pointer-events-none"
+            className="absolute inset-0 rounded-2xl pointer-events-none"
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(255,255,255,0.02) 100%)',
+              background: 'linear-gradient(160deg, rgba(201,168,76,0.04) 0%, transparent 40%, rgba(59,130,246,0.02) 100%)',
             }}
           />
 
-          {/* Logo & Branding */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-center mb-10 relative"
+            className="text-center mb-8 relative"
           >
             <motion.div
-              initial={{ scale: 0, rotate: -180 }}
+              initial={{ scale: 0, rotate: -90 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.3, duration: 0.6, type: 'spring', stiffness: 150 }}
-              className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-primary to-purple-500 shadow-lg shadow-primary/25 flex items-center justify-center"
+              transition={{ delay: 0.3, duration: 0.5, type: 'spring', stiffness: 120 }}
+              className="w-14 h-14 mx-auto mb-4 rounded-xl bg-gradient-to-br from-gold to-gold-light shadow-[0_0_20px_rgba(201,168,76,0.3)] flex items-center justify-center"
             >
-              <Zap className="w-8 h-8 text-white" />
+              <Zap className="w-7 h-7 text-[#08080e]" />
             </motion.div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-white to-white/70 bg-clip-text text-transparent">
+
+            <h1 className="text-xl font-bold text-foreground tracking-tight">
               Black En
             </h1>
-            <p className="text-white/40 text-sm mt-1.5 font-medium tracking-wide uppercase">
+            <p className="text-muted-foreground text-xs mt-1 tracking-widest uppercase font-medium">
               Admin Panel
             </p>
+
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-gold/20" />
+              <Shield className="w-3.5 h-3.5 text-gold/40" />
+              <span className="text-[11px] text-gold/50 font-medium tracking-wide">SECURE LOGIN</span>
+              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-gold/20" />
+            </div>
           </motion.div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 relative">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 relative" aria-label="Login form">
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -15 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.35, duration: 0.4 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
             >
+              <label htmlFor="username" className="sr-only">ชื่อผู้ใช้</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 pointer-events-none" aria-hidden="true" />
                 <input
+                  id="username"
                   {...register('username')}
                   placeholder="ชื่อผู้ใช้"
                   autoComplete="username"
                   spellCheck={false}
-                  className={`
-                    w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white
-                    bg-white/[0.04] border outline-none transition-all duration-200
-                    placeholder:text-white/20
-                    ${errors.username
-                      ? 'border-red-400/50 focus:border-red-400 focus:ring-2 focus:ring-red-400/20'
-                      : 'border-white/[0.08] focus:border-primary/50 focus:ring-2 focus:ring-primary/20'
-                    }
-                    hover:bg-white/[0.06]
-                  `}
+                  aria-required="true"
+                  aria-invalid={errors.username ? 'true' : undefined}
+                  aria-describedby={errors.username ? 'username-error' : undefined}
+                  className={inputClass(errors.username)}
                 />
-                {errors.username && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-xs text-red-400 mt-1.5 pl-1"
-                  >
-                    {errors.username.message}
-                  </motion.p>
-                )}
               </div>
+              {errors.username && (
+                <motion.p
+                  id="username-error"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-xs text-red-400 mt-1.5 pl-1"
+                  role="alert"
+                >
+                  {errors.username.message}
+                </motion.p>
+              )}
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -15 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4, duration: 0.4 }}
+              transition={{ delay: 0.38, duration: 0.4 }}
             >
+              <label htmlFor="password" className="sr-only">รหัสผ่าน</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 pointer-events-none" aria-hidden="true" />
                 <input
+                  id="password"
                   {...register('password')}
                   type={showPassword ? 'text' : 'password'}
                   placeholder="รหัสผ่าน"
                   autoComplete="current-password"
-                  className={`
-                    w-full h-12 pl-10 pr-12 rounded-xl text-sm text-white
-                    bg-white/[0.04] border outline-none transition-all duration-200
-                    placeholder:text-white/20
-                    ${errors.password
-                      ? 'border-red-400/50 focus:border-red-400 focus:ring-2 focus:ring-red-400/20'
-                      : 'border-white/[0.08] focus:border-primary/50 focus:ring-2 focus:ring-primary/20'
-                    }
-                    hover:bg-white/[0.06]
-                  `}
+                  aria-required="true"
+                  aria-invalid={errors.password ? 'true' : undefined}
+                  aria-describedby={errors.password ? 'password-error' : undefined}
+                  className={inputClass(errors.password) + ' pr-11'}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors rounded-md p-1"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
-                {errors.password && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-xs text-red-400 mt-1.5 pl-1"
-                  >
-                    {errors.password.message}
-                  </motion.p>
-                )}
               </div>
+              {errors.password && (
+                <motion.p
+                  id="password-error"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-xs text-red-400 mt-1.5 pl-1"
+                  role="alert"
+                >
+                  {errors.password.message}
+                </motion.p>
+              )}
             </motion.div>
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="remember"
+                  className="size-3.5 rounded border-white/20 bg-white/[0.05] text-gold accent-gold cursor-pointer"
+                />
+                <label htmlFor="remember" className="text-xs text-muted-foreground cursor-pointer select-none">
+                  จดจำฉัน
+                </label>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-gold/60 hover:text-gold transition-colors"
+                onClick={() => toast.info('กรุณาติดต่อผู้ดูแลระบบ')}
+              >
+                ลืมรหัสผ่าน?
+              </button>
+            </div>
 
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.45, duration: 0.4 }}
+              className="pt-1"
             >
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className={`
-                  relative w-full h-12 rounded-xl font-semibold text-sm overflow-hidden
+                  relative w-full h-11 rounded-lg font-semibold text-sm overflow-hidden
                   transition-all duration-200
                   ${isSubmitting
-                    ? 'bg-primary/50 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-primary to-purple-500 hover:from-primary-hover hover:to-purple-600 active:scale-[0.98] shadow-lg shadow-primary/25'
+                    ? 'bg-gold/40 cursor-not-allowed text-white/60'
+                    : 'bg-gradient-to-r from-gold to-gold-light hover:brightness-110 active:scale-[0.98] shadow-[0_0_20px_rgba(201,168,76,0.2)] hover:shadow-[0_0_30px_rgba(201,168,76,0.3)]'
                   }
                 `}
+                aria-label="เข้าสู่ระบบ"
               >
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-2">
@@ -258,10 +265,10 @@ function Login() {
                       transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                       className="block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                     />
-                    <span className="text-white/80">กำลังเข้าสู่ระบบ...</span>
+                    <span className="text-[#08080e]/70">กำลังเข้าสู่ระบบ...</span>
                   </span>
                 ) : (
-                  <span className="flex items-center justify-center gap-2 text-white">
+                  <span className="flex items-center justify-center gap-2 text-[#08080e]">
                     <LogIn className="w-4 h-4" />
                     เข้าสู่ระบบ
                   </span>
@@ -270,15 +277,16 @@ function Login() {
             </motion.div>
           </form>
 
-          {/* Footer */}
-          <motion.p
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.4 }}
-            className="text-center text-white/20 text-xs mt-8"
+            className="mt-6 pt-5 border-t border-white/[0.05] text-center"
           >
-            &copy; {new Date().getFullYear()} Black En. All rights reserved.
-          </motion.p>
+            <p className="text-[11px] text-white/20">
+              &copy; {new Date().getFullYear()} Black En — RAN Online Admin Panel
+            </p>
+          </motion.div>
         </div>
       </motion.div>
     </div>

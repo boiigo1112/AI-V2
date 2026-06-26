@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, ArrowRight, XCircle } from 'lucide-react';
-import { Button } from '../../components/ui/button';
+import { Button } from '@/components/ui/button';
 
 const dbLabels = { RanUser: 'บัญชีผู้เล่น', RanGame1: 'ตัวละคร', RanLog: 'บันทึก', RanShop: 'ร้านค้า' };
 

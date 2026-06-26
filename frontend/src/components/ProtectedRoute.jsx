@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 
 function ProtectedRoute({ children, requiredPermission }) {
   const { user, loading } = useAuth();

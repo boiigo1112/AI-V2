@@ -1,18 +1,19 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
+import { SidebarProvider, SidebarInset } from '../components/ui/sidebar';
 
 function MainLayout() {
   return (
-    <div className="min-h-screen">
+    <SidebarProvider>
       <Sidebar />
-      <div className="ml-60 min-h-screen flex flex-col">
+      <SidebarInset>
         <Navbar />
         <main className="flex-1 p-6">
           <Outlet />
         </main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 

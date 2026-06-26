@@ -1,6 +1,6 @@
 import { LogOut, User } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 
 function Navbar() {
   const { user, logout } = useAuth();

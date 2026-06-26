@@ -30,12 +30,14 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	authSvc := services.NewAuthService(cfg)
 	userSvc := services.NewUserService()
+	gameSvc := services.NewGameService(cfg.JWTSecret)
 
 	ah := handlers.NewAuthHandler(authSvc, cfg)
 	uh := handlers.NewUserHandler(userSvc)
 	dh := handlers.NewDashboardHandler()
 	sh := handlers.NewSettingsHandler()
-	ih := handlers.NewInstallHandler()
+	ih := handlers.NewInstallHandler(cfg.JWTSecret)
+	gh := handlers.NewGameHandler(gameSvc)
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -48,6 +50,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		install := api.Group("/install")
 		{
 			install.GET("/status", ih.Status)
+			install.GET("/pending", ih.PendingScan)
 			install.POST("/connect", ih.ConnectGameDB)
 			install.POST("/mappings", ih.SaveMappings)
 			install.POST("/complete", ih.CompleteInstall)
@@ -75,6 +78,25 @@ func Setup(cfg *config.Config) *gin.Engine {
 			p.GET("/roles", middleware.RequirePermission("roles", "read"), uh.ListRoles)
 			p.PUT("/settings/profile", sh.UpdateProfile)
 			p.PUT("/settings/password", sh.ChangePassword)
+
+			game := p.Group("/game")
+			{
+				game.GET("/status", gh.Status)
+				game.POST("/reconnect", gh.Reconnect)
+				game.GET("/databases", gh.ListDatabases)
+				game.GET("/databases/:db/tables", gh.ListTables)
+				game.GET("/databases/:db/tables/all", gh.ListAllTables)
+				game.GET("/databases/:db/tables/:table/columns", gh.GetTableColumns)
+				game.GET("/players", gh.ListPlayers)
+				game.GET("/players/:id", gh.GetPlayer)
+				game.GET("/players/:id/characters", gh.GetPlayerCharacters)
+				game.POST("/players/:id/block", gh.BlockPlayer)
+				game.POST("/players/:id/unblock", gh.UnblockPlayer)
+				game.PUT("/characters/:id", gh.UpdateCharacter)
+				game.PUT("/players/:id", gh.UpdatePlayer)
+				game.GET("/shop", gh.ListShopItems)
+				game.GET("/logs/:db", gh.ListLogs)
+			}
 		}
 	}
 

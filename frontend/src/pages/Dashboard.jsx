@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Users, UserCheck, Gamepad2, Coins } from 'lucide-react';
-import { useDashboardStats, useUsers } from '@/hooks/use-dashboard';
+import { Users, UserCheck, Gamepad2 } from 'lucide-react';
+import { useDashboardStats } from '@/hooks/use-dashboard';
 import { ServerStatusBar } from '@/components/game/ServerStatusBar';
 import { HeroRevenue } from '@/components/game/HeroRevenue';
 import { QuickStatsRow } from '@/components/game/QuickStatsRow';
@@ -11,8 +11,7 @@ import { ActivityFeed } from '@/components/game/ActivityFeed';
 import { Leaderboard } from '@/components/game/Leaderboard';
 
 function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useDashboardStats('7d');
-  const { data: users = [] } = useUsers();
+  const { data: stats } = useDashboardStats('7d');
 
   const quickStats = useMemo(() => [
     { icon: Users, label: 'Total Players', value: stats?.total_users, color: '#818cf8', trend: 8 },

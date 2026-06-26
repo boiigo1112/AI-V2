@@ -1,14 +1,13 @@
 import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Users as UsersIcon, UserCheck, UserPlus, Shield, Pencil, Trash2, Search, Filter, ChevronDown, MoreHorizontal, Eye } from 'lucide-react';
+import { Users as UsersIcon, UserCheck, UserPlus, Shield, Pencil, Trash2, Search, Eye } from 'lucide-react';
 import { useUsers, useRoles, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { GlassCard } from '@/components/game/GlassCard';
@@ -41,23 +40,9 @@ const userSchema = z.object({
   role_id: z.string().min(1, 'กรุณาเลือกบทบาท'),
 });
 
-function Breadcrumb() {
-  return (
-    <nav className="flex items-center gap-2 text-sm text-muted-foreground">
-      <a href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</a>
-      <span>/</span>
-      <span className="text-foreground font-medium">Users</span>
-    </nav>
-  );
-}
-
 function SummaryCard({ icon: Icon, label, value, color, delay }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-    >
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
       <GlassCard className="p-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}12` }}>
@@ -65,9 +50,7 @@ function SummaryCard({ icon: Icon, label, value, color, delay }) {
           </div>
           <div>
             <p className="text-xs text-muted-foreground font-medium">{label}</p>
-            <p className="text-xl font-bold text-foreground">
-              <AnimatedCounter value={value} duration={800} />
-            </p>
+            <p className="text-xl font-bold text-foreground"><AnimatedCounter value={value} duration={800} /></p>
           </div>
         </div>
       </GlassCard>
@@ -87,7 +70,6 @@ function Users() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [showFilters, setShowFilters] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [viewUser, setViewUser] = useState(null);
 
@@ -180,22 +162,7 @@ function Users() {
   };
 
   return (
-    <div className="flex flex-col gap-5 max-w-[1400px] mx-auto">
-      {/* Breadcrumb */}
-      <Breadcrumb />
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">จัดการผู้ใช้</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">จัดการบัญชีผู้ใช้และบทบาทในระบบ</p>
-        </div>
-        <Button onClick={openCreate} disabled={isLoading} className="bg-gold hover:bg-gold-light text-[#08080e] font-semibold shadow-lg shadow-gold/20">
-          <UserPlus className="w-4 h-4 mr-1.5" />
-          เพิ่มผู้ใช้
-        </Button>
-      </div>
-
+    <div className="flex flex-col gap-5">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard icon={UsersIcon} label="ผู้ใช้ทั้งหมด" value={stats.total} color="#818cf8" delay={0.05} />
@@ -204,7 +171,7 @@ function Users() {
         <SummaryCard icon={UserPlus} label="เพิ่มใหม่ (7 วัน)" value={stats.new} color="#3b82f6" delay={0.2} />
       </div>
 
-      {/* Search + Filter Bar */}
+      {/* Filter Toolbar */}
       <GlassCard className="p-4">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1">
@@ -237,6 +204,11 @@ function Users() {
               <option value="active">ใช้งานอยู่</option>
               <option value="inactive">ระงับ</option>
             </select>
+            <Separator orientation="vertical" className="h-6 bg-white/[0.08]" />
+            <Button onClick={openCreate} disabled={isLoading} size="sm" className="bg-gold hover:bg-gold-light text-[#08080e] font-semibold shadow-lg shadow-gold/20">
+              <UserPlus className="w-3.5 h-3.5 mr-1" />
+              เพิ่ม
+            </Button>
           </div>
         </div>
         {(searchQuery || roleFilter !== 'all' || statusFilter !== 'all') && (

@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { GlassCard } from './GlassCard';
 
 const periodData = {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+
 
 function ProgressRing({ value = 0, max = 100, size = 120, strokeWidth = 6, color = '#c9a84c', bgColor = 'rgba(255,255,255,0.06)' }) {
   const [animatedValue, setAnimatedValue] = useState(0);
@@ -9,7 +9,7 @@ function ProgressRing({ value = 0, max = 100, size = 120, strokeWidth = 6, color
   const percentage = Math.round((animatedValue / max) * 100);
 
   useEffect(() => {
-    let start = 0;
+    
     const startTime = Date.now();
     const duration = 1500;
 

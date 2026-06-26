@@ -100,7 +100,7 @@ export function useUpdateCharacter() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, field, value }) => api.put(`/game/characters/${id}`, { field, value }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'player'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game'] }),
   });
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wifi, WifiOff, Clock, Users, Coins, Activity } from 'lucide-react';
+import { Wifi, Clock, Activity } from 'lucide-react';
 
 function ServerStatusBar({ serverName = 'RAN Online Server', online = 47, maxOnline = 500, uptime = '99.9%' }) {
   const [pulse, setPulse] = useState(true);

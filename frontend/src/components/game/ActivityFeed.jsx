@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { GlassCard } from './GlassCard';
-import { UserPlus, Swords, ShoppingCart, Shield, Trophy, Zap, ChevronRight } from 'lucide-react';
+import { UserPlus, Swords, ShoppingCart, Shield, Trophy, Zap, ChevronRight, Activity } from 'lucide-react';
 
 const typeConfig = {
   join: { icon: UserPlus, color: '#34d399' },

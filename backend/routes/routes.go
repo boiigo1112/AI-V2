@@ -95,6 +95,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.PUT("/characters/:id", gh.UpdateCharacter)
 				game.PUT("/players/:id", gh.UpdatePlayer)
 				game.GET("/shop", gh.ListShopItems)
+				game.POST("/shop", gh.CreateShopItem)
+				game.PUT("/shop/:id", gh.UpdateShopItem)
+				game.DELETE("/shop/:id", gh.DeleteShopItem)
 				game.GET("/logs/:db", gh.ListLogs)
 			}
 		}

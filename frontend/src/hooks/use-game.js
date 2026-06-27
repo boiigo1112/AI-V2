@@ -105,11 +105,35 @@ export function useUpdateCharacter() {
 }
 
 export function useGameShopItems(params = {}) {
-  const { table = 'GameItemShop', limit = 50, offset = 0 } = params;
+  const { table = 'ShopItemMap', limit = 50, offset = 0 } = params;
   return useQuery({
     queryKey: ['game', 'shop', table, limit, offset],
     queryFn: () => api.get('/game/shop', { params: { table, limit, offset } }).then(r => r.data),
     staleTime: 30_000,
+  });
+}
+
+export function useCreateShopItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/shop', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'shop'] }),
+  });
+}
+
+export function useUpdateShopItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }) => api.put(`/game/shop/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'shop'] }),
+  });
+}
+
+export function useDeleteShopItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete(`/game/shop/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'shop'] }),
   });
 }
 

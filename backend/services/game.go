@@ -704,6 +704,98 @@ func (s *GameService) ListShopItems(tableName string, limit, offset int) ([]map[
 	return results, total, nil
 }
 
+func (s *GameService) CreateShopItem(name string, price, stock, main, sub int, category string, section int) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	safeName := sanitizeSearch(name)
+	safeCategory := sanitizeSearch(category)
+	query := fmt.Sprintf(
+		"INSERT INTO [RanShop]..[ShopItemMap] ([ItemName], [ItemPrice], [ItemStock], [ItemMain], [ItemSub], [Category], [ItemSection]) VALUES ('%s', %d, %d, %d, %d, '%s', %d)",
+		safeName, price, stock, main, sub, safeCategory, section,
+	)
+	_, err := gdb.DB.Exec(query)
+	return err
+}
+
+func (s *GameService) UpdateShopItem(id string, fields map[string]interface{}) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	id = sanitizeInt(id)
+	if id == "0" {
+		return fmt.Errorf("invalid item id")
+	}
+
+	allowedFields := map[string]bool{
+		"ItemName": true, "ItemMoney": true, "ItemStock": true,
+		"ItemMain": true, "ItemSub": true, "ItemPrice": true,
+		"ItemSection": true, "ItemCurrency": true, "ItemDiscount": true,
+		"Category": true, "ItemComment": true,
+	}
+
+	var setClauses []string
+	for key, val := range fields {
+		if !allowedFields[key] {
+			continue
+		}
+		switch v := val.(type) {
+		case string:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = '%s'", key, sanitizeSearch(v)))
+		case float64:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = %d", key, int(v)))
+		case int:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = %d", key, v))
+		default:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = '%s'", key, sanitizeSearch(fmt.Sprintf("%v", v))))
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return fmt.Errorf("no valid fields to update")
+	}
+
+	query := fmt.Sprintf("UPDATE [RanShop]..[ShopItemMap] SET %s WHERE [ProductNum] = %s",
+		strings.Join(setClauses, ", "), id)
+
+	result, err := gdb.DB.Exec(query)
+	if err != nil {
+		return fmt.Errorf("update failed: %v", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("item not found")
+	}
+	return nil
+}
+
+func (s *GameService) DeleteShopItem(id string) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	id = sanitizeInt(id)
+	if id == "0" {
+		return fmt.Errorf("invalid item id")
+	}
+
+	query := fmt.Sprintf("DELETE FROM [RanShop]..[ShopItemMap] WHERE [ProductNum] = %s", id)
+	result, err := gdb.DB.Exec(query)
+	if err != nil {
+		return fmt.Errorf("delete failed: %v", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("item not found")
+	}
+	return nil
+}
+
 func (s *GameService) Reconnect(host string, port int, username, password string) error {
 	gdb, err := gamedatabase.Connect(gamedatabase.GameDBConnection{
 		ID:       "reconnect-" + host,

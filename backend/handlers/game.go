@@ -208,7 +208,7 @@ func (h *GameHandler) UpdatePlayer(c *gin.Context) {
 }
 
 func (h *GameHandler) ListShopItems(c *gin.Context) {
-	tableName := c.DefaultQuery("table", "GameItemShop")
+	tableName := c.DefaultQuery("table", "ShopItemMap")
 	limitStr := c.DefaultQuery("limit", "50")
 	offsetStr := c.DefaultQuery("offset", "0")
 
@@ -230,6 +230,101 @@ func (h *GameHandler) ListShopItems(c *gin.Context) {
 		items = []map[string]interface{}{}
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "total": total})
+}
+
+func (h *GameHandler) CreateShopItem(c *gin.Context) {
+	var req struct {
+		ItemName    string `json:"item_name" binding:"required"`
+		ItemPrice   int    `json:"item_price"`
+		ItemStock   int    `json:"item_stock"`
+		ItemMain    int    `json:"item_main"`
+		ItemSub     int    `json:"item_sub"`
+		Category    string `json:"category"`
+		ItemSection int    `json:"item_section"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+
+	if err := h.svc.CreateShopItem(req.ItemName, req.ItemPrice, req.ItemStock, req.ItemMain, req.ItemSub, req.Category, req.ItemSection); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "สร้างสินค้าสำเร็จ"})
+}
+
+func (h *GameHandler) UpdateShopItem(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		ItemName     *string `json:"ItemName"`
+		ItemMoney    *int    `json:"ItemMoney"`
+		ItemStock    *int    `json:"ItemStock"`
+		ItemMain     *int    `json:"ItemMain"`
+		ItemSub      *int    `json:"ItemSub"`
+		ItemCategory *int    `json:"ItemCategory"`
+		ShopType     *int    `json:"ShopType"`
+		ItemPrice    *int    `json:"ItemPrice"`
+		ItemSection  *int    `json:"ItemSection"`
+		ItemCurrency *int    `json:"ItemCurrency"`
+		Category     *string `json:"Category"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+
+	fields := make(map[string]interface{})
+	if req.ItemName != nil {
+		fields["ItemName"] = *req.ItemName
+	}
+	if req.ItemMoney != nil {
+		fields["ItemMoney"] = *req.ItemMoney
+	}
+	if req.ItemStock != nil {
+		fields["ItemStock"] = *req.ItemStock
+	}
+	if req.ItemMain != nil {
+		fields["ItemMain"] = *req.ItemMain
+	}
+	if req.ItemSub != nil {
+		fields["ItemSub"] = *req.ItemSub
+	}
+	if req.ItemCategory != nil {
+		fields["ItemCategory"] = *req.ItemCategory
+	}
+	if req.ShopType != nil {
+		fields["ShopType"] = *req.ShopType
+	}
+	if req.ItemPrice != nil {
+		fields["ItemPrice"] = *req.ItemPrice
+	}
+	if req.ItemSection != nil {
+		fields["ItemSection"] = *req.ItemSection
+	}
+	if req.ItemCurrency != nil {
+		fields["ItemCurrency"] = *req.ItemCurrency
+	}
+	if req.Category != nil {
+		fields["Category"] = *req.Category
+	}
+
+	if err := h.svc.UpdateShopItem(id, fields); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "อัปเดตสินค้าสำเร็จ"})
+}
+
+func (h *GameHandler) DeleteShopItem(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.svc.DeleteShopItem(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ลบสินค้าสำเร็จ"})
 }
 
 func (h *GameHandler) ListLogs(c *gin.Context) {

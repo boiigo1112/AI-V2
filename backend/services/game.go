@@ -108,12 +108,198 @@ func (s *GameService) GetConnectionInfo() map[string]interface{} {
 		return nil
 	}
 	return map[string]interface{}{
-		"host":     s.gameDB.Config.Host,
-		"port":     s.gameDB.Config.Port,
-		"database": s.gameDB.Config.Database,
-		"username": s.gameDB.Config.Username,
+		"host":      s.gameDB.Config.Host,
+		"port":      s.gameDB.Config.Port,
+		"database":  s.gameDB.Config.Database,
 		"connected": s.IsConnected(),
 	}
+}
+
+func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	whereClauses := []string{}
+	if search != "" {
+		safeSearch := sanitizeSearch(search)
+		whereClauses = append(whereClauses, fmt.Sprintf("([ChaName] LIKE '%%%%%s%%%%' OR CAST([ChaNum] AS VARCHAR) LIKE '%%%%%s%%%%')", safeSearch, safeSearch))
+	}
+	if classFilter != "" {
+		safeClass := sanitizeInt(classFilter)
+		whereClauses = append(whereClauses, fmt.Sprintf("[ChaClass] = %s", safeClass))
+	}
+	if levelMin != "" && levelMin != "0" {
+		whereClauses = append(whereClauses, fmt.Sprintf("[ChaLevel] >= %s", sanitizeInt(levelMin)))
+	}
+	if levelMax != "" && levelMax != "999" {
+		whereClauses = append(whereClauses, fmt.Sprintf("[ChaLevel] <= %s", sanitizeInt(levelMax)))
+	}
+	if onlineOnly == "1" {
+		whereClauses = append(whereClauses, "[ChaOnline] = 1")
+	} else if onlineOnly == "0" {
+		whereClauses = append(whereClauses, "[ChaOnline] = 0")
+	}
+
+	whereStr := ""
+	if len(whereClauses) > 0 {
+		whereStr = "WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	var total int
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] %s", whereStr)
+	if err := gdb.DB.QueryRow(countQuery).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	dataQuery := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaSchool],[ChaTribe],[ChaReborn],[ChaMoney],[ChaExp],[ChaPower],[ChaOnline],[UserNum] FROM [RanGame1]..[ChaInfo] %s ORDER BY [ChaLevel] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", whereStr, offset, limit)
+	rows, err := gdb.DB.Query(dataQuery)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	columns, _ := rows.Columns()
+	var results []map[string]interface{}
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+		if err := rows.Scan(valuePtrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range columns {
+			val := values[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
+func (s *GameService) GetCharacterDetail(chanum string) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	chanum = sanitizeInt(chanum)
+	if chanum == "0" {
+		return nil, fmt.Errorf("invalid character id")
+	}
+
+	query := fmt.Sprintf("SELECT * FROM [RanGame1]..[ChaInfo] WHERE [ChaNum] = %s", chanum)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("character not found")
+	}
+
+	columns, _ := rows.Columns()
+	values := make([]interface{}, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
+	for i := range values {
+		valuePtrs[i] = &values[i]
+	}
+	if err := rows.Scan(valuePtrs...); err != nil {
+		return nil, err
+	}
+
+	row := make(map[string]interface{})
+	for i, col := range columns {
+		val := values[i]
+		if b, ok := val.([]byte); ok {
+			row[col] = string(b)
+		} else {
+			row[col] = val
+		}
+	}
+	return row, nil
+}
+
+func (s *GameService) CharacterStats() (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var total, online, buster, tempster, engineer, prowler, forceGunner, defender int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo]").Scan(&total)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaOnline] = 1").Scan(&online)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 1").Scan(&buster)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 2").Scan(&tempster)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 3").Scan(&engineer)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 4").Scan(&prowler)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 5").Scan(&forceGunner)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 6").Scan(&defender)
+
+	return map[string]interface{}{
+		"total":       total,
+		"online":      online,
+		"offline":     total - online,
+		"buster":      buster,
+		"tempster":    tempster,
+		"engineer":    engineer,
+		"prowler":     prowler,
+		"force_gunner": forceGunner,
+		"defender":    defender,
+	}, nil
+}
+
+func (s *GameService) BanCharacter(chanum, reason string) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	chanum = sanitizeInt(chanum)
+	if chanum == "0" {
+		return fmt.Errorf("invalid character id")
+	}
+
+	var exists int
+	if err := gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaNum] = " + chanum).Scan(&exists); err != nil || exists == 0 {
+		return fmt.Errorf("ไม่พบตัวละคร")
+	}
+
+	query := fmt.Sprintf("UPDATE [RanGame1]..[ChaInfo] SET [ChaDeleted] = 1 WHERE [ChaNum] = %s", chanum)
+	_, err := gdb.DB.Exec(query)
+	return err
+}
+
+func (s *GameService) UnbanCharacter(chanum string) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	chanum = sanitizeInt(chanum)
+	if chanum == "0" {
+		return fmt.Errorf("invalid character id")
+	}
+
+	query := fmt.Sprintf("UPDATE [RanGame1]..[ChaInfo] SET [ChaDeleted] = 0 WHERE [ChaNum] = %s", chanum)
+	result, err := gdb.DB.Exec(query)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("character not found")
+	}
+	return nil
 }
 
 type ColumnInfo struct {

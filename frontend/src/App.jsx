@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import Players from './pages/Players';
 import Logs from './pages/Logs';
 import Shop from './pages/Shop';
+import Characters from './pages/Characters';
 import GameStatus from './pages/GameStatus';
 
 function AnimatedPage({ children }) {
@@ -38,6 +39,7 @@ function App() {
             <Route path="/users" element={<ProtectedRoute requiredPermission="users.read"><AnimatedPage><Users /></AnimatedPage></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredPermission="settings.read"><AnimatedPage><Settings /></AnimatedPage></ProtectedRoute>} />
             <Route path="/game/players" element={<AnimatedPage><Players /></AnimatedPage>} />
+            <Route path="/game/characters" element={<AnimatedPage><Characters /></AnimatedPage>} />
             <Route path="/game/shop" element={<AnimatedPage><Shop /></AnimatedPage>} />
             <Route path="/game/logs" element={<AnimatedPage><Logs /></AnimatedPage>} />
             <Route path="/game/status" element={<AnimatedPage><GameStatus /></AnimatedPage>} />

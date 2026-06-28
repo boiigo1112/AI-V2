@@ -400,3 +400,77 @@ func (h *GameHandler) ListAllTables(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"tables": result})
 }
+
+func (h *GameHandler) ListAllCharacters(c *gin.Context) {
+	search := c.Query("search")
+	classFilter := c.Query("class")
+	levelMin := c.DefaultQuery("level_min", "0")
+	levelMax := c.DefaultQuery("level_max", "999")
+	onlineOnly := c.DefaultQuery("online", "")
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	characters, total, err := h.svc.ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if characters == nil {
+		characters = []map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"characters": characters, "total": total})
+}
+
+func (h *GameHandler) GetCharacterDetail(c *gin.Context) {
+	chanum := c.Param("id")
+
+	character, err := h.svc.GetCharacterDetail(chanum)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, character)
+}
+
+func (h *GameHandler) CharacterStats(c *gin.Context) {
+	stats, err := h.svc.CharacterStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
+func (h *GameHandler) BanCharacter(c *gin.Context) {
+	chanum := c.Param("id")
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	c.ShouldBindJSON(&req)
+
+	if err := h.svc.BanCharacter(chanum, req.Reason); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ระงับตัวละครสำเร็จ"})
+}
+
+func (h *GameHandler) UnbanCharacter(c *gin.Context) {
+	chanum := c.Param("id")
+
+	if err := h.svc.UnbanCharacter(chanum); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ปลดระงับตัวละครสำเร็จ"})
+}

@@ -511,6 +511,69 @@ func (h *GameHandler) PetStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+// ======================== PK Ranking Handlers ========================
+
+func (h *GameHandler) PKRanking(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	ranking, total, err := h.svc.PKRanking(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if ranking == nil {
+		ranking = []map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"ranking": ranking, "total": total})
+}
+
+func (h *GameHandler) PKDeathRanking(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	ranking, total, err := h.svc.PKDeathRanking(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if ranking == nil {
+		ranking = []map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"ranking": ranking, "total": total})
+}
+
+func (h *GameHandler) PKStats(c *gin.Context) {
+	stats, err := h.svc.PKStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
+func (h *GameHandler) PKRecordHistory(c *gin.Context) {
+	id := c.Param("id")
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	records, total, err := h.svc.PKRecordHistory(id, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if records == nil {
+		records = []map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"records": records, "total": total})
+}
+
 func (h *GameHandler) ListAllCharacters(c *gin.Context) {
 	search := c.Query("search")
 	classFilter := c.Query("class")

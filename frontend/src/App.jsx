@@ -16,6 +16,7 @@ import Shop from './pages/Shop';
 import Characters from './pages/Characters';
 import Guild from './pages/Guild';
 import Pets from './pages/Pets';
+import PKRanking from './pages/PKRanking';
 import Gmc from './pages/Gmc';
 import GameStatus from './pages/GameStatus';
 
@@ -43,6 +44,7 @@ function App() {
             <Route path="/settings" element={<ProtectedRoute requiredPermission="settings.read"><AnimatedPage><Settings /></AnimatedPage></ProtectedRoute>} />
             <Route path="/game/players" element={<AnimatedPage><Players /></AnimatedPage>} />
             <Route path="/game/characters" element={<AnimatedPage><Characters /></AnimatedPage>} />
+            <Route path="/game/pk-ranking" element={<AnimatedPage><PKRanking /></AnimatedPage>} />
             <Route path="/game/pets" element={<AnimatedPage><Pets /></AnimatedPage>} />
             <Route path="/game/guild" element={<AnimatedPage><Guild /></AnimatedPage>} />
             <Route path="/game/gmc" element={<AnimatedPage><Gmc /></AnimatedPage>} />

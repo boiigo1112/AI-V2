@@ -119,6 +119,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.GET("/pets/stats", gh.PetStats)
 				game.GET("/pets/:id", gh.GetPetDetail)
 				game.PUT("/pets/:id", gh.UpdatePet)
+				game.GET("/pk-ranking", gh.PKRanking)
+				game.GET("/pk-ranking/death", gh.PKDeathRanking)
+				game.GET("/pk-ranking/stats", gh.PKStats)
+				game.GET("/pk-ranking/:id", gh.PKRecordHistory)
 			}
 		}
 	}

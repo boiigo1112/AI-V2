@@ -950,6 +950,158 @@ func (s *GameService) PetStats() (map[string]interface{}, error) {
 	}, nil
 }
 
+// ======================== PK Ranking Services ========================
+
+func (s *GameService) PKRanking(limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0").Scan(&total)
+
+	query := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaPK],[ChaPKScore],[ChaPKDeath],[ChaOnline] FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0 ORDER BY [ChaPKScore] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return []map[string]interface{}{}, total, nil
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var results []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
+func (s *GameService) PKDeathRanking(limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaPKDeath] > 0").Scan(&total)
+
+	query := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaPK],[ChaPKScore],[ChaPKDeath],[ChaOnline] FROM [RanGame1]..[ChaInfo] WHERE [ChaPKDeath] > 0 ORDER BY [ChaPKDeath] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return []map[string]interface{}{}, total, nil
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var results []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
+func (s *GameService) PKStats() (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var totalPlayers, totalPK int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo]").Scan(&totalPlayers)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0").Scan(&totalPK)
+
+	var avgPK, maxPK float64
+	gdb.DB.QueryRow("SELECT ISNULL(AVG(CAST([ChaPKScore] AS FLOAT)), 0) FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0").Scan(&avgPK)
+	gdb.DB.QueryRow("SELECT ISNULL(MAX([ChaPKScore]), 0) FROM [RanGame1]..[ChaInfo]").Scan(&maxPK)
+
+	return map[string]interface{}{
+		"total_players": totalPlayers,
+		"total_pk":      totalPK,
+		"avg_pk_score":  int(avgPK),
+		"max_pk_score":  int(maxPK),
+	}, nil
+}
+
+func (s *GameService) PKRecordHistory(chaNum string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	chaNum = sanitizeInt(chaNum)
+	if chaNum == "0" {
+		return nil, 0, nil
+	}
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PKRecord] WHERE [ChaNum] = " + chaNum).Scan(&total)
+
+	query := fmt.Sprintf("SELECT [PKRecordNum],[ChaKillNum],[ChaKillName],[ChaPKRecord] FROM [RanGame1]..[PKRecord] WHERE [ChaNum] = %s ORDER BY [PKRecordNum] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", chaNum, offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return []map[string]interface{}{}, total, nil
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var results []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
 	if gdb == nil {

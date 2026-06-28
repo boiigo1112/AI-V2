@@ -317,3 +317,39 @@ export function useUpdatePet() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['game'] }),
   });
 }
+
+export function usePKRanking(params = {}) {
+  const { limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'pk', 'ranking', limit, offset],
+    queryFn: () => api.get('/game/pk-ranking', { params: { limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function usePKDeathRanking(params = {}) {
+  const { limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'pk', 'death', limit, offset],
+    queryFn: () => api.get('/game/pk-ranking/death', { params: { limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function usePKStats() {
+  return useQuery({
+    queryKey: ['game', 'pk', 'stats'],
+    queryFn: () => api.get('/game/pk-ranking/stats').then(r => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function usePKRecordHistory(id, params = {}) {
+  const { limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'pk', 'history', id, limit, offset],
+    queryFn: () => api.get(`/game/pk-ranking/${id}`, { params: { limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
+    enabled: !!id,
+  });
+}

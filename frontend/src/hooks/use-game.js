@@ -283,3 +283,37 @@ export function useUpdateGuild() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['game'] }),
   });
 }
+
+export function usePets(params = {}) {
+  const { search = '', limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'pets', search, limit, offset],
+    queryFn: () => api.get('/game/pets', { params: { search, limit, offset } }).then(r => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function usePetDetail(id) {
+  return useQuery({
+    queryKey: ['game', 'pet', id],
+    queryFn: () => api.get(`/game/pets/${id}`).then(r => r.data),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
+}
+
+export function usePetStats() {
+  return useQuery({
+    queryKey: ['game', 'petStats'],
+    queryFn: () => api.get('/game/pets/stats').then(r => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdatePet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fields }) => api.put(`/game/pets/${id}`, { fields }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game'] }),
+  });
+}

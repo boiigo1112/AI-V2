@@ -115,6 +115,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.GET("/guilds/stats", gh.GuildStats)
 				game.GET("/guilds/:id", gh.GetGuildDetail)
 				game.PUT("/guilds/:id", gh.UpdateGuild)
+				game.GET("/pets", gh.ListPets)
+				game.GET("/pets/stats", gh.PetStats)
+				game.GET("/pets/:id", gh.GetPetDetail)
+				game.PUT("/pets/:id", gh.UpdatePet)
 			}
 		}
 	}

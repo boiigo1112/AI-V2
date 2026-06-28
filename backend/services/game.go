@@ -766,6 +766,190 @@ func (s *GameService) ListGuildWarriors(guNum string) ([]map[string]interface{},
 	return list, nil
 }
 
+// ======================== Pet Services ========================
+
+func (s *GameService) ListPets(search string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	where := ""
+	if search != "" {
+		safe := sanitizeSearch(search)
+		where = " WHERE [PetName] LIKE '%" + safe + "%' OR [PetChaNum] IN (SELECT [ChaNum] FROM [RanGame1]..[ChaInfo] WHERE [ChaName] LIKE '%" + safe + "%')"
+	}
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo]" + where).Scan(&total)
+
+	query := fmt.Sprintf("SELECT p.[PetNum],p.[PetName],p.[PetChaNum],p.[PetType],p.[PetStyle],p.[PetColor],p.[PetFull],p.[PetDeleted],p.[PetCreateDate],c.[ChaName] as owner_name FROM [RanGame1]..[PetInfo] p LEFT JOIN [RanGame1]..[ChaInfo] c ON p.[PetChaNum] = c.[ChaNum]%s ORDER BY p.[PetCreateDate] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", where, offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return []map[string]interface{}{}, total, nil
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var results []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
+func (s *GameService) GetPetDetail(petNum string) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	petNum = sanitizeInt(petNum)
+	if petNum == "0" {
+		return nil, fmt.Errorf("invalid pet id")
+	}
+
+	query := fmt.Sprintf("SELECT * FROM [RanGame1]..[PetInfo] WHERE [PetNum] = %s", petNum)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, fmt.Errorf("not found")
+	}
+
+	cols, _ := rows.Columns()
+	vals := make([]interface{}, len(cols))
+	ptrs := make([]interface{}, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	if err := rows.Scan(ptrs...); err != nil {
+		return nil, err
+	}
+	pet := make(map[string]interface{})
+	for i, col := range cols {
+		val := vals[i]
+		if b, ok := val.([]byte); ok {
+			pet[col] = string(b)
+		} else {
+			pet[col] = val
+		}
+	}
+
+	var ownerName string
+	gdb.DB.QueryRow("SELECT [ChaName] FROM [RanGame1]..[ChaInfo] WHERE [ChaNum] = %v", pet["PetChaNum"]).Scan(&ownerName)
+	pet["owner_name"] = ownerName
+
+	// Get inventory
+	invenRows, err := gdb.DB.Query("SELECT [PetInvenNum],[PetNum],[PetInvenType],[PetInvenMID],[PetInvenSID],[PetInvenCMID],[PetInvenCSID],[PetInvenAvailable] FROM [RanGame1]..[PetInven] WHERE [PetNum] = " + petNum)
+	if err == nil {
+		defer invenRows.Close()
+		invCols, _ := invenRows.Columns()
+		var inven []map[string]interface{}
+		for invenRows.Next() {
+			iv := make([]interface{}, len(invCols))
+			ip := make([]interface{}, len(invCols))
+			for i := range iv {
+				ip[i] = &iv[i]
+			}
+			if err := invenRows.Scan(ip...); err != nil {
+				continue
+			}
+			item := make(map[string]interface{})
+			for i, col := range invCols {
+				val := iv[i]
+				if b, ok := val.([]byte); ok {
+					item[col] = string(b)
+				} else {
+					item[col] = val
+				}
+			}
+			inven = append(inven, item)
+		}
+		pet["inventory"] = inven
+	}
+	return pet, nil
+}
+
+func (s *GameService) UpdatePet(petNum string, fields map[string]interface{}) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	petNum = sanitizeInt(petNum)
+	if petNum == "0" {
+		return fmt.Errorf("invalid pet id")
+	}
+
+	allowedFields := map[string]bool{
+		"PetName": true, "PetType": true, "PetStyle": true,
+		"PetColor": true, "PetFull": true, "PetSkinScale": true,
+	}
+
+	var setClauses []string
+	for key, val := range fields {
+		if !allowedFields[key] {
+			continue
+		}
+		switch v := val.(type) {
+		case string:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = '%s'", key, sanitizeSearch(v)))
+		case float64:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = %d", key, int(v)))
+		case int:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = %d", key, v))
+		default:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = '%s'", key, sanitizeSearch(fmt.Sprintf("%v", v))))
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return fmt.Errorf("no valid fields")
+	}
+
+	query := fmt.Sprintf("UPDATE [RanGame1]..[PetInfo] SET %s WHERE [PetNum] = %s", strings.Join(setClauses, ", "), petNum)
+	_, err := gdb.DB.Exec(query)
+	return err
+}
+
+func (s *GameService) PetStats() (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var total, available, deleted int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo]").Scan(&total)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo] WHERE [PetDeleted] = 0").Scan(&available)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo] WHERE [PetDeleted] = 1").Scan(&deleted)
+
+	return map[string]interface{}{
+		"total":     total,
+		"available": available,
+		"deleted":   deleted,
+	}, nil
+}
+
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
 	if gdb == nil {

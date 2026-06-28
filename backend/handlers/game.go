@@ -456,6 +456,61 @@ func (h *GameHandler) GuildStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+// ======================== Pet Handlers ========================
+
+func (h *GameHandler) ListPets(c *gin.Context) {
+	search := c.Query("search")
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	pets, total, err := h.svc.ListPets(search, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if pets == nil {
+		pets = []map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"pets": pets, "total": total})
+}
+
+func (h *GameHandler) GetPetDetail(c *gin.Context) {
+	id := c.Param("id")
+	pet, err := h.svc.GetPetDetail(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, pet)
+}
+
+func (h *GameHandler) UpdatePet(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Fields map[string]interface{} `json:"fields" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+	if err := h.svc.UpdatePet(id, req.Fields); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "อัปเดตสัตว์เลี้ยงสำเร็จ"})
+}
+
+func (h *GameHandler) PetStats(c *gin.Context) {
+	stats, err := h.svc.PetStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
 func (h *GameHandler) ListAllCharacters(c *gin.Context) {
 	search := c.Query("search")
 	classFilter := c.Query("class")

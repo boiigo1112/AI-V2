@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, Zap, Gamepad2, ScrollText, ShoppingBag, Wifi, LogOut, Shield, Swords, ShieldCheck, Castle, PawPrint, Crosshair, Lock, TicketPlus, Ban } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, Zap, Gamepad2, ScrollText, ShoppingBag, Wifi, LogOut, Shield, Swords, ShieldCheck, Castle, PawPrint, Crosshair, Lock, TicketPlus, Ban, Globe } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameStatus } from '@/hooks/use-game';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ const adminMenuItems = [
 const gameMenuItems = [
   { path: '/game/players', label: 'Players', icon: Gamepad2 },
   { path: '/game/characters', label: 'Characters', icon: Swords },
+  { path: '/game/online-map', label: 'Online Map', icon: Globe },
   { path: '/game/guild', label: 'Guild', icon: Castle },
   { path: '/game/pets', label: 'Pets', icon: PawPrint },
   { path: '/game/pk-ranking', label: 'PK Ranking', icon: Crosshair },

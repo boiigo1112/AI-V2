@@ -140,6 +140,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.POST("/ban-manager/ban-ip", gh.BanIP)
 				game.POST("/ban-manager/ban-pc", gh.BanPC)
 				game.POST("/ban-manager/unban", gh.Unban)
+				// Online Map
+				game.GET("/online-map/players", gh.ListOnlinePlayers)
+				game.GET("/online-map/stats", gh.OnlineMapStats)
 			}
 
 			// Coupon routes

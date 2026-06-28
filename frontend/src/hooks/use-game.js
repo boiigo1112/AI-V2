@@ -471,3 +471,23 @@ export function useUnbanFromManager() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'ban-manager'] }); qc.invalidateQueries({ queryKey: ['game', 'security'] }); },
   });
 }
+
+// ======================== Online Map ========================
+
+export function useOnlinePlayers() {
+  return useQuery({
+    queryKey: ['game', 'online-map', 'players'],
+    queryFn: () => api.get('/game/online-map/players').then(r => r.data),
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useOnlineMapStats() {
+  return useQuery({
+    queryKey: ['game', 'online-map', 'stats'],
+    queryFn: () => api.get('/game/online-map/stats').then(r => r.data),
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+  });
+}

@@ -22,6 +22,7 @@ import Gmc from './pages/Gmc';
 import Coupons from './pages/Coupons';
 import GameStatus from './pages/GameStatus';
 import BanManager from './pages/BanManager';
+import OnlineMap from './pages/OnlineMap';
 
 function AnimatedPage({ children }) {
   return (
@@ -47,6 +48,7 @@ function App() {
             <Route path="/settings" element={<ProtectedRoute requiredPermission="settings.read"><AnimatedPage><Settings /></AnimatedPage></ProtectedRoute>} />
             <Route path="/game/players" element={<AnimatedPage><Players /></AnimatedPage>} />
             <Route path="/game/characters" element={<AnimatedPage><Characters /></AnimatedPage>} />
+            <Route path="/game/online-map" element={<AnimatedPage><OnlineMap /></AnimatedPage>} />
             <Route path="/game/pk-ranking" element={<AnimatedPage><PKRanking /></AnimatedPage>} />
             <Route path="/game/player-security" element={<AnimatedPage><PlayerSecurity /></AnimatedPage>} />
             <Route path="/game/coupons" element={<AnimatedPage><Coupons /></AnimatedPage>} />

@@ -725,6 +725,27 @@ func (h *GameHandler) BanManagerStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+// ======================== Online Map Handlers ========================
+
+func (h *GameHandler) ListOnlinePlayers(c *gin.Context) {
+	players, err := h.svc.ListOnlinePlayers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if players == nil { players = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"players": players})
+}
+
+func (h *GameHandler) OnlineMapStats(c *gin.Context) {
+	stats, err := h.svc.OnlineMapStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
 func (h *GameHandler) ListAllCharacters(c *gin.Context) {
 	search := c.Query("search")
 	classFilter := c.Query("class")

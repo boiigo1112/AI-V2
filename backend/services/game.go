@@ -1223,6 +1223,43 @@ func (s *GameService) BanManagerStats() (map[string]interface{}, error) {
 	}, nil
 }
 
+// ======================== Online Map Services ========================
+
+func (s *GameService) ListOnlinePlayers() ([]map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
+
+	query := `SELECT c.[ChaNum],c.[ChaName],c.[ChaLevel],c.[ChaClass],c.[ChaStartMap],
+		c.[ChaPosX],c.[ChaPosY],c.[ChaPosZ],c.[ChaOnline],
+		u.[UserNum],u.[UserID],u.[UserIP],u.[LastIP],u.[UserLoginState]
+	FROM [RanGame1]..[ChaInfo] c
+	LEFT JOIN [RanUser]..[UserInfo] u ON c.[UserNum] = u.[UserNum]
+	WHERE c.[ChaOnline] = 1
+	ORDER BY c.[ChaLevel] DESC`
+
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return []map[string]interface{}{}, nil }
+	defer rows.Close()
+
+	return scanRows(rows), nil
+}
+
+func (s *GameService) OnlineMapStats() (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
+
+	var totalOnline int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaOnline] = 1").Scan(&totalOnline)
+
+	var uniqueMaps int
+	gdb.DB.QueryRow("SELECT COUNT(DISTINCT [ChaStartMap]) FROM [RanGame1]..[ChaInfo] WHERE [ChaOnline] = 1").Scan(&uniqueMaps)
+
+	return map[string]interface{}{
+		"online":      totalOnline,
+		"unique_maps": uniqueMaps,
+	}, nil
+}
+
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
 	if gdb == nil {

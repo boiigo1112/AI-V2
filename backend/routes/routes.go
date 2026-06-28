@@ -104,6 +104,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.POST("/characters/:id/ban", gh.BanCharacter)
 				game.POST("/characters/:id/unban", gh.UnbanCharacter)
 				game.GET("/logs/:db", gh.ListLogs)
+				game.GET("/gmc/lookup", gh.GmcLookup)
+				game.POST("/gmc/send-item", gh.GmcSendItem)
+				game.POST("/gmc/update-point", gh.GmcUpdatePoint)
+				game.GET("/gmc/history/:id", gh.GmcPlayerHistory)
+				game.GET("/gmc/logs", gh.GmcLogs)
+				game.POST("/gmc/notice", gh.GmcNotice)
+				game.GET("/gmc/item-tracking", gh.GmcItemTracking)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/blacken/admin-panel/database"
 	"github.com/blacken/admin-panel/gamedatabase"
@@ -113,6 +114,431 @@ func (s *GameService) GetConnectionInfo() map[string]interface{} {
 		"database":  s.gameDB.Config.Database,
 		"connected": s.IsConnected(),
 	}
+}
+
+// ======================== GMC Services ========================
+
+func (s *GameService) GmcLookup(q string) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var where string
+	if safeIntRegex.MatchString(q) {
+		where = "[UserNum] = " + sanitizeInt(q)
+	} else {
+		where = "[UserID] = '" + sanitizeSearch(q) + "'"
+	}
+
+	query := fmt.Sprintf("SELECT [UserNum],[UserID],[UserName],[UserFullName],[UserEmail],[UserPoint],[UserVIP],[VotePoint],[UserAge],[UserBlock],[UserAvailable],[UserType],[LastLoginDate],[LastIP],[CreateDate] FROM [RanUser]..[UserInfo] WHERE %s", where)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("ไม่พบผู้เล่น")
+	}
+
+	columns, _ := rows.Columns()
+	values := make([]interface{}, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
+	for i := range values {
+		valuePtrs[i] = &values[i]
+	}
+	if err := rows.Scan(valuePtrs...); err != nil {
+		return nil, err
+	}
+
+	account := make(map[string]interface{})
+	for i, col := range columns {
+		val := values[i]
+		if b, ok := val.([]byte); ok {
+			account[col] = string(b)
+		} else {
+			account[col] = val
+		}
+	}
+
+	charQuery := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaSchool],[ChaReborn],[ChaMoney],[ChaExp],[ChaPower],[ChaOnline],[ChaDeleted],[ChaInvenLine] FROM [RanGame1]..[ChaInfo] WHERE [UserNum] = %v", account["UserNum"])
+	charRows, err := gdb.DB.Query(charQuery)
+	if err == nil {
+		defer charRows.Close()
+		charCols, _ := charRows.Columns()
+		var chars []map[string]interface{}
+		for charRows.Next() {
+			cValues := make([]interface{}, len(charCols))
+			cPtrs := make([]interface{}, len(charCols))
+			for i := range cValues {
+				cPtrs[i] = &cValues[i]
+			}
+			if err := charRows.Scan(cPtrs...); err != nil {
+				continue
+			}
+			char := make(map[string]interface{})
+			for i, col := range charCols {
+				val := cValues[i]
+				if b, ok := val.([]byte); ok {
+					char[col] = string(b)
+				} else {
+					char[col] = val
+				}
+			}
+			chars = append(chars, char)
+		}
+		account["characters"] = chars
+	}
+	if account["characters"] == nil {
+		account["characters"] = []map[string]interface{}{}
+	}
+
+	return account, nil
+}
+
+func (s *GameService) GmcSendItem(targetType, targetID string, productNum, quantity int) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	result := map[string]interface{}{"success": 0, "failed": 0}
+
+	insertBoth := func(userNum int) {
+		gdb.DB.Exec("INSERT INTO [RanShop]..[ShopPurchase] ([UserUID], [ProductNum], [PurPrice], [PurFlag], [PurDate], [GiftedBy]) VALUES (" +
+			fmt.Sprintf("%d", userNum) + ", " + fmt.Sprintf("%d", productNum) + ", 0, 0, GETDATE(), 'GMC')")
+		gdb.DB.Exec("INSERT INTO [RanShop]..[ItemGiftHistory] ([UserUID], [ProductNum], [EligibleAmt], [GiftedAt], [GiftCategory]) VALUES (" +
+			fmt.Sprintf("%d", userNum) + ", " + fmt.Sprintf("%d", productNum) + ", " + fmt.Sprintf("%d", quantity) + ", GETDATE(), 'GMC')")
+	}
+
+	switch targetType {
+	case "id":
+		if targetID == "" {
+			return nil, fmt.Errorf("กรุณาระบุ UserID")
+		}
+		safeID := sanitizeSearch(targetID)
+		var userNum int
+		err := gdb.DB.QueryRow("SELECT [UserNum] FROM [RanUser]..[UserInfo] WHERE [UserID] = '"+safeID+"'").Scan(&userNum)
+		if err != nil {
+			return nil, fmt.Errorf("ไม่พบผู้ใช้")
+		}
+		insertBoth(userNum)
+		result["success"] = 1
+
+	case "online":
+		rows, err := gdb.DB.Query("SELECT [UserNum] FROM [RanUser]..[UserInfo] WHERE [UserNum] IN (SELECT [UserNum] FROM [RanGame1]..[ChaInfo] WHERE [ChaOnline] = 1)")
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var userNum int
+				rows.Scan(&userNum)
+				insertBoth(userNum)
+			}
+			result["success"] = 1
+		}
+
+	case "all":
+		rows, err := gdb.DB.Query("SELECT [UserNum] FROM [RanUser]..[UserInfo]")
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var userNum int
+				rows.Scan(&userNum)
+				insertBoth(userNum)
+			}
+			result["success"] = 1
+		}
+	}
+
+	return result, nil
+}
+
+func (s *GameService) GmcUpdatePoint(targetType, targetID, pointType string, amount int, mode string) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	allowedPoints := map[string]bool{
+		"UserPoint": true, "UserVIP": true, "VotePoint": true,
+		"ExchangeItemPoints": true, "UserAge": true,
+	}
+	if !allowedPoints[pointType] {
+		return nil, fmt.Errorf("ประเภทพ้อยท์ไม่ถูกต้อง")
+	}
+
+	operation := "+"
+	if mode == "subtract" {
+		operation = "-"
+	}
+
+	result := map[string]interface{}{"affected": 0}
+
+	switch targetType {
+	case "id":
+		safeID := sanitizeSearch(targetID)
+		var userNum string
+		err := gdb.DB.QueryRow("SELECT [UserNum] FROM [RanUser]..[UserInfo] WHERE [UserID] = '" + safeID + "'").Scan(&userNum)
+		if err != nil {
+			return nil, fmt.Errorf("ไม่พบผู้ใช้")
+		}
+		query := fmt.Sprintf("UPDATE [RanUser]..[UserInfo] SET [%s] = [%s] %s %d WHERE [UserNum] = %s", pointType, pointType, operation, amount, userNum)
+		res, err := gdb.DB.Exec(query)
+		if err == nil {
+			rows, _ := res.RowsAffected()
+			result["affected"] = rows
+		}
+
+	case "online":
+		query := fmt.Sprintf("UPDATE [RanUser]..[UserInfo] SET [%s] = [%s] %s %d WHERE [UserNum] IN (SELECT [UserNum] FROM [RanGame1]..[ChaInfo] WHERE [ChaOnline] = 1)", pointType, pointType, operation, amount)
+		res, err := gdb.DB.Exec(query)
+		if err == nil {
+			rows, _ := res.RowsAffected()
+			result["affected"] = rows
+		}
+
+	case "all":
+		query := fmt.Sprintf("UPDATE [RanUser]..[UserInfo] SET [%s] = [%s] %s %d", pointType, pointType, operation, amount)
+		res, err := gdb.DB.Exec(query)
+		if err == nil {
+			rows, _ := res.RowsAffected()
+			result["affected"] = rows
+		}
+	}
+
+	return result, nil
+}
+
+func (s *GameService) GmcPlayerHistory(id, logType string) ([]map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var userNum string
+	if safeIntRegex.MatchString(id) {
+		userNum = sanitizeInt(id)
+	} else {
+		err := gdb.DB.QueryRow("SELECT [UserNum] FROM [RanUser]..[UserInfo] WHERE [UserID] = '"+sanitizeSearch(id)+"'").Scan(&userNum)
+		if err != nil {
+			return nil, fmt.Errorf("ไม่พบผู้ใช้")
+		}
+	}
+
+	if userNum == "0" {
+		return nil, fmt.Errorf("invalid id")
+	}
+
+	var allHistory []map[string]interface{}
+	appendLogs := func(db, query string) {
+		rows, err := gdb.DB.Query(query)
+		if err != nil {
+			return
+		}
+		defer rows.Close()
+		cols, _ := rows.Columns()
+		for rows.Next() {
+			vals := make([]interface{}, len(cols))
+			ptrs := make([]interface{}, len(cols))
+			for i := range vals {
+				ptrs[i] = &vals[i]
+			}
+			if err := rows.Scan(ptrs...); err != nil {
+				continue
+			}
+			row := map[string]interface{}{"source": db}
+			for i, col := range cols {
+				val := vals[i]
+				if b, ok := val.([]byte); ok {
+					row[col] = string(b)
+				} else {
+					row[col] = val
+				}
+			}
+			allHistory = append(allHistory, row)
+		}
+	}
+
+	if logType == "" || logType == "login" {
+		appendLogs("LogLogin", fmt.Sprintf("SELECT TOP 20 * FROM [RanUser]..[LogLogin] WHERE [UserNum] = %s ORDER BY [LogDate] DESC", userNum))
+	}
+	if logType == "" || logType == "point" {
+		appendLogs("PointConsumeLog", fmt.Sprintf("SELECT TOP 20 * FROM [RanUser]..[PointConsumeLog] WHERE [UserNum] = %s ORDER BY [Date] DESC", userNum))
+	}
+	if logType == "" || logType == "shop" {
+		appendLogs("GISPurchaseLog", fmt.Sprintf("SELECT TOP 20 * FROM [RanShop]..[GISPurchaseLog] WHERE [UserID] = (SELECT [UserID] FROM [RanUser]..[UserInfo] WHERE [UserNum] = %s) ORDER BY [Date] DESC", userNum))
+	}
+	if logType == "" || logType == "logaction" {
+		appendLogs("LogAction", fmt.Sprintf("SELECT TOP 20 a.* FROM [RanLog]..[LogAction] a WHERE [ChaNum] IN (SELECT [ChaNum] FROM [RanGame1]..[ChaInfo] WHERE [UserNum] = %s) ORDER BY [ActionDate] DESC", userNum))
+	}
+	if logType == "" || logType == "itemexchange" {
+		appendLogs("LogItemExchange", fmt.Sprintf("SELECT TOP 20 * FROM [RanLog]..[LogItemExchange] WHERE NIDMain IN (SELECT [ChaNum] FROM [RanGame1]..[ChaInfo] WHERE [UserNum] = %s) ORDER BY [ExchangeDate] DESC", userNum))
+	}
+	if logType == "" || logType == "gmcmd" {
+		appendLogs("LogGmCmd", fmt.Sprintf("SELECT TOP 20 * FROM [RanUser]..[LogGmCmd] WHERE [UserNum] = %s ORDER BY [LogDate] DESC", userNum))
+	}
+
+	if allHistory == nil {
+		allHistory = []map[string]interface{}{}
+	}
+	return allHistory, nil
+}
+
+func (s *GameService) GmcLogs(limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	var total int
+	countQuery := "SELECT COUNT(*) FROM [RanLog]..[GM_Logs]"
+	if err := gdb.DB.QueryRow(countQuery).Scan(&total); err != nil {
+		total = 0
+	}
+
+	query := fmt.Sprintf("SELECT * FROM [RanLog]..[GM_Logs] ORDER BY [Date] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return []map[string]interface{}{}, total, nil
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var allLogs []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		allLogs = append(allLogs, row)
+	}
+
+	if allLogs == nil {
+		allLogs = []map[string]interface{}{}
+	}
+	return allLogs, total, nil
+}
+
+func (s *GameService) GmcNotice(subject, content string) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	safeMessage := sanitizeSearch(subject + " - " + content)
+
+	query := fmt.Sprintf("INSERT INTO [RanGame1]..[GameNotice] ([Message], [DaySunday], [DayMonday], [DayTuesday], [DayWednesday], [DayThursday], [DayFriday], [DaySaturday], [Type], [Hour], [Minute]) VALUES ('%s', 1,1,1,1,1,1,1, 0, 0, 0)", safeMessage)
+	_, err := gdb.DB.Exec(query)
+	return err
+}
+
+func (s *GameService) GmcItemTracking(uid string) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	uid = sanitizeSearch(uid)
+	result := map[string]interface{}{"items": []map[string]interface{}{}, "total": 0, "received": 0, "pending": 0, "failed": 0}
+
+	var userNum int
+	var lastLogin sql.NullTime
+	err := gdb.DB.QueryRow("SELECT [UserNum],[LastLoginDate] FROM [RanUser]..[UserInfo] WHERE [UserID] = '"+uid+"'").Scan(&userNum, &lastLogin)
+	if err != nil {
+		return result, nil
+	}
+
+	userNumStr := fmt.Sprintf("%d", userNum)
+	var items []map[string]interface{}
+	received, pending, failed := 0, 0, 0
+	now := time.Now()
+
+	// ShopPurchase — items sent via shop/GM
+	shopRows, err := gdb.DB.Query("SELECT [PurKey],[ProductNum],[PurPrice],[PurFlag],[PurDate],[PurChgDate],[GiftedBy] FROM [RanShop]..[ShopPurchase] WHERE [UserUID] = " + userNumStr + " ORDER BY [PurDate] DESC")
+	if err == nil {
+		defer shopRows.Close()
+		for shopRows.Next() {
+			var purKey, productNum, purPrice, purFlag int
+			var purDate, purChgDate sql.NullTime
+			var giftedBy sql.NullString
+			if err := shopRows.Scan(&purKey, &productNum, &purPrice, &purFlag, &purDate, &purChgDate, &giftedBy); err != nil {
+				continue
+			}
+			status := "pending"
+			if purFlag == 1 {
+				status = "received"
+				received++
+			} else if purFlag == 2 {
+				status = "failed"
+				failed++
+			} else {
+				pending++
+			}
+			items = append(items, map[string]interface{}{
+				"source":     "ShopPurchase",
+				"ref_id":     purKey,
+				"product_num": productNum,
+				"price":      purPrice,
+				"pur_flag":   purFlag,
+				"sent_date":  purDate.Time,
+				"received_date": purChgDate.Time,
+				"sent_by":    giftedBy.String,
+				"status":     status,
+			})
+		}
+	}
+
+	// ItemGiftHistory — items sent via GMC
+	giftRows, err := gdb.DB.Query("SELECT [GiftID],[ProductNum],[EligibleAmt],[GiftedAt] FROM [RanShop]..[ItemGiftHistory] WHERE [UserUID] = " + userNumStr + " ORDER BY [GiftedAt] DESC")
+	if err == nil {
+		defer giftRows.Close()
+		for giftRows.Next() {
+			var giftID, productNum, eligibleAmt int
+			var giftedAt time.Time
+			if err := giftRows.Scan(&giftID, &productNum, &eligibleAmt, &giftedAt); err != nil {
+				continue
+			}
+			status := "pending"
+			if lastLogin.Valid && lastLogin.Time.After(giftedAt) {
+				status = "received"
+				received++
+			} else if now.Sub(giftedAt) > 7*24*time.Hour {
+				status = "failed"
+				failed++
+			} else {
+				pending++
+			}
+			items = append(items, map[string]interface{}{
+				"source":      "ItemGiftHistory",
+				"ref_id":      giftID,
+				"product_num": productNum,
+				"quantity":    eligibleAmt,
+				"sent_date":   giftedAt,
+				"status":      status,
+			})
+		}
+	}
+
+	result["items"] = items
+	result["total"] = len(items)
+	result["received"] = received
+	result["pending"] = pending
+	result["failed"] = failed
+	return result, nil
 }
 
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {

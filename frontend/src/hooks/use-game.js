@@ -146,3 +146,106 @@ export function useGameLogs(dbName, params = {}) {
     enabled: !!dbName,
   });
 }
+
+export function useAllCharacters(params = {}) {
+  const { search = '', class: classFilter = '', level_min = '0', level_max = '999', online = '', limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'characters', search, classFilter, level_min, level_max, online, limit, offset],
+    queryFn: () => api.get('/game/characters', { params: { search, class: classFilter, level_min, level_max, online, limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useCharacterDetail(id) {
+  return useQuery({
+    queryKey: ['game', 'character', id],
+    queryFn: () => api.get(`/game/characters/${id}`).then(r => r.data),
+    staleTime: 30_000,
+    enabled: !!id,
+  });
+}
+
+export function useCharacterStats() {
+  return useQuery({
+    queryKey: ['game', 'characterStats'],
+    queryFn: () => api.get('/game/characters/stats').then(r => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useBanCharacter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }) => api.post(`/game/characters/${id}/ban`, { reason }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game'] }),
+  });
+}
+
+export function useUnbanCharacter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.post(`/game/characters/${id}/unban`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game'] }),
+  });
+}
+
+// GMC hooks
+export function useGmcLookup(q) {
+  return useQuery({
+    queryKey: ['game', 'gmc', 'lookup', q],
+    queryFn: () => api.get('/game/gmc/lookup', { params: { q } }).then(r => r.data),
+    enabled: !!q && q.length > 0,
+    staleTime: 30_000,
+  });
+}
+
+export function useGmcSendItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/gmc/send-item', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'gmc'] }),
+  });
+}
+
+export function useGmcUpdatePoint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/gmc/update-point', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'gmc'] }),
+  });
+}
+
+export function useGmcPlayerHistory(id, type) {
+  return useQuery({
+    queryKey: ['game', 'gmc', 'history', id, type],
+    queryFn: () => api.get(`/game/gmc/history/${id}`, { params: { type } }).then(r => r.data.history || []),
+    enabled: !!id,
+    staleTime: 30_000,
+  });
+}
+
+export function useGmcLogs(params = {}) {
+  const { limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'gmc', 'logs', limit, offset],
+    queryFn: () => api.get('/game/gmc/logs', { params: { limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useGmcNotice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/gmc/notice', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'gmc'] }),
+  });
+}
+
+export function useGmcItemTracking(uid) {
+  return useQuery({
+    queryKey: ['game', 'gmc', 'tracking', uid],
+    queryFn: () => api.get('/game/gmc/item-tracking', { params: { uid } }).then(r => r.data),
+    enabled: !!uid,
+    staleTime: 30_000,
+  });
+}

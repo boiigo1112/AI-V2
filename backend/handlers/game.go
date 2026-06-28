@@ -474,3 +474,119 @@ func (h *GameHandler) UnbanCharacter(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ปลดระงับตัวละครสำเร็จ"})
 }
+
+// ======================== GMC Handlers ========================
+
+func (h *GameHandler) GmcLookup(c *gin.Context) {
+	q := c.Query("q")
+	if q == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ UserNum หรือ UserID"})
+		return
+	}
+
+	result, err := h.svc.GmcLookup(q)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *GameHandler) GmcSendItem(c *gin.Context) {
+	var req struct {
+		TargetType  string `json:"target_type" binding:"required"`
+		TargetID    string `json:"target_id"`
+		ProductNum  int    `json:"product_num" binding:"required"`
+		Quantity    int    `json:"quantity" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+
+	result, err := h.svc.GmcSendItem(req.TargetType, req.TargetID, req.ProductNum, req.Quantity)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ส่งไอเทมสำเร็จ", "results": result})
+}
+
+func (h *GameHandler) GmcUpdatePoint(c *gin.Context) {
+	var req struct {
+		TargetType string `json:"target_type" binding:"required"`
+		TargetID   string `json:"target_id"`
+		PointType  string `json:"point_type" binding:"required"`
+		Amount     int    `json:"amount" binding:"required"`
+		Mode       string `json:"mode" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+
+	result, err := h.svc.GmcUpdatePoint(req.TargetType, req.TargetID, req.PointType, req.Amount, req.Mode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ดำเนินการสำเร็จ", "results": result})
+}
+
+func (h *GameHandler) GmcPlayerHistory(c *gin.Context) {
+	id := c.Param("id")
+	logType := c.DefaultQuery("type", "")
+
+	history, err := h.svc.GmcPlayerHistory(id, logType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"history": history})
+}
+
+func (h *GameHandler) GmcLogs(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	logs, total, err := h.svc.GmcLogs(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"logs": logs, "total": total})
+}
+
+func (h *GameHandler) GmcNotice(c *gin.Context) {
+	var req struct {
+		Subject string `json:"subject" binding:"required"`
+		Content string `json:"content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+
+	if err := h.svc.GmcNotice(req.Subject, req.Content); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ประกาศสำเร็จ"})
+}
+
+func (h *GameHandler) GmcItemTracking(c *gin.Context) {
+	uid := c.Query("uid")
+	if uid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ UserID"})
+		return
+	}
+
+	result, err := h.svc.GmcItemTracking(uid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}

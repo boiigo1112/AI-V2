@@ -111,6 +111,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.GET("/gmc/logs", gh.GmcLogs)
 				game.POST("/gmc/notice", gh.GmcNotice)
 				game.GET("/gmc/item-tracking", gh.GmcItemTracking)
+				game.GET("/guilds", gh.ListGuilds)
+				game.GET("/guilds/stats", gh.GuildStats)
+				game.GET("/guilds/:id", gh.GetGuildDetail)
+				game.PUT("/guilds/:id", gh.UpdateGuild)
 			}
 		}
 	}

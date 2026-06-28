@@ -541,6 +541,231 @@ func (s *GameService) GmcItemTracking(uid string) (map[string]interface{}, error
 	return result, nil
 }
 
+// ======================== Guild Services ========================
+
+func (s *GameService) ListGuilds(search string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, 0, fmt.Errorf("game database not connected")
+	}
+
+	where := ""
+	if search != "" {
+		safe := sanitizeSearch(search)
+		where = " WHERE [GuName] LIKE '%" + safe + "%'"
+	}
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[GuildInfo]" + where).Scan(&total)
+
+	query := fmt.Sprintf("SELECT [GuNum],[GuName],[GuMaster],[GuMemberNum],[GuMoney],[GuMakeTime],[GuBattleWin],[GuBattleLose],[GuBattleDraw],[GuMarkVer] FROM [RanGame1]..[GuildInfo]%s ORDER BY [GuMemberNum] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", where, offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return []map[string]interface{}{}, total, nil
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var results []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+	return results, total, nil
+}
+
+func (s *GameService) GetGuildDetail(guNum string) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	guNum = sanitizeInt(guNum)
+	if guNum == "0" {
+		return nil, fmt.Errorf("invalid guild id")
+	}
+
+	query := fmt.Sprintf("SELECT * FROM [RanGame1]..[GuildInfo] WHERE [GuNum] = %s", guNum)
+	rows, err := gdb.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, fmt.Errorf("ไม่พบกิลด์")
+	}
+
+	cols, _ := rows.Columns()
+	vals := make([]interface{}, len(cols))
+	ptrs := make([]interface{}, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	if err := rows.Scan(ptrs...); err != nil {
+		return nil, err
+	}
+
+	guild := make(map[string]interface{})
+	for i, col := range cols {
+		val := vals[i]
+		if b, ok := val.([]byte); ok {
+			guild[col] = string(b)
+		} else {
+			guild[col] = val
+		}
+	}
+
+	// Get members
+	var members []map[string]interface{}
+	memberRows, err := gdb.DB.Query("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaGuName],[GuPosition],[ChaOnline] FROM [RanGame1]..[ChaInfo] WHERE [GuNum] = " + guNum + " AND [GuPosition] > 0 ORDER BY [ChaLevel] DESC")
+	if err == nil {
+		defer memberRows.Close()
+		mCols, _ := memberRows.Columns()
+		for memberRows.Next() {
+			mVals := make([]interface{}, len(mCols))
+			mPtrs := make([]interface{}, len(mCols))
+			for i := range mVals {
+				mPtrs[i] = &mVals[i]
+			}
+			if err := memberRows.Scan(mPtrs...); err != nil {
+				continue
+			}
+			mem := make(map[string]interface{})
+			for i, col := range mCols {
+				val := mVals[i]
+				if b, ok := val.([]byte); ok {
+					mem[col] = string(b)
+				} else {
+					mem[col] = val
+				}
+			}
+			members = append(members, mem)
+		}
+	}
+	guild["members"] = members
+	return guild, nil
+}
+
+func (s *GameService) UpdateGuild(guNum string, fields map[string]interface{}) error {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return fmt.Errorf("game database not connected")
+	}
+
+	guNum = sanitizeInt(guNum)
+	if guNum == "0" {
+		return fmt.Errorf("invalid guild id")
+	}
+
+	allowedFields := map[string]bool{
+		"GuName": true, "GuNotice": true, "GuRank": true,
+		"GuMoney": true, "GuIncomeMoney": true,
+	}
+
+	var setClauses []string
+	for key, val := range fields {
+		if !allowedFields[key] {
+			continue
+		}
+		switch v := val.(type) {
+		case string:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = '%s'", key, sanitizeSearch(v)))
+		case float64:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = %d", key, int(v)))
+		case int:
+			setClauses = append(setClauses, fmt.Sprintf("[%s] = %d", key, v))
+		}
+	}
+
+	if len(setClauses) == 0 {
+		return fmt.Errorf("no valid fields to update")
+	}
+
+	query := fmt.Sprintf("UPDATE [RanGame1]..[GuildInfo] SET %s WHERE [GuNum] = %s", strings.Join(setClauses, ", "), guNum)
+	_, err := gdb.DB.Exec(query)
+	return err
+}
+
+func (s *GameService) GuildStats() (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var total, totalMembers int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[GuildInfo]").Scan(&total)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [GuPosition] > 0").Scan(&totalMembers)
+
+	avgMembers := 0
+	if total > 0 {
+		avgMembers = totalMembers / total
+	}
+	return map[string]interface{}{
+		"total_guilds":  total,
+		"total_members": totalMembers,
+		"avg_members":   avgMembers,
+	}, nil
+}
+
+func (s *GameService) ListGuildWarriors(guNum string) ([]map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	guNum = sanitizeInt(guNum)
+	if guNum == "0" {
+		return nil, nil
+	}
+
+	rows, err := gdb.DB.Query("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaGuName],[GuPosition],[ChaOnline] FROM [RanGame1]..[ChaInfo] WHERE [GuNum] = " + guNum + " AND [GuPosition] > 0 ORDER BY [ChaLevel] DESC")
+	if err != nil {
+		return nil, nil
+	}
+	defer rows.Close()
+
+	cols, _ := rows.Columns()
+	var list []map[string]interface{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		ptrs := make([]interface{}, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]interface{})
+		for i, col := range cols {
+			val := vals[i]
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		list = append(list, row)
+	}
+	return list, nil
+}
+
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
 	if gdb == nil {

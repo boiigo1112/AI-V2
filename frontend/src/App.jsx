@@ -14,6 +14,7 @@ import Players from './pages/Players';
 import Logs from './pages/Logs';
 import Shop from './pages/Shop';
 import Characters from './pages/Characters';
+import Guild from './pages/Guild';
 import Gmc from './pages/Gmc';
 import GameStatus from './pages/GameStatus';
 
@@ -41,6 +42,7 @@ function App() {
             <Route path="/settings" element={<ProtectedRoute requiredPermission="settings.read"><AnimatedPage><Settings /></AnimatedPage></ProtectedRoute>} />
             <Route path="/game/players" element={<AnimatedPage><Players /></AnimatedPage>} />
             <Route path="/game/characters" element={<AnimatedPage><Characters /></AnimatedPage>} />
+            <Route path="/game/guild" element={<AnimatedPage><Guild /></AnimatedPage>} />
             <Route path="/game/gmc" element={<AnimatedPage><Gmc /></AnimatedPage>} />
             <Route path="/game/shop" element={<AnimatedPage><Shop /></AnimatedPage>} />
             <Route path="/game/logs" element={<AnimatedPage><Logs /></AnimatedPage>} />

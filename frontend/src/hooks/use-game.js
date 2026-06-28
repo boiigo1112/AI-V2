@@ -249,3 +249,37 @@ export function useGmcItemTracking(uid) {
     staleTime: 30_000,
   });
 }
+
+export function useGuilds(params = {}) {
+  const { search = '', limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'guilds', search, limit, offset],
+    queryFn: () => api.get('/game/guilds', { params: { search, limit, offset } }).then(r => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useGuildDetail(id) {
+  return useQuery({
+    queryKey: ['game', 'guild', id],
+    queryFn: () => api.get(`/game/guilds/${id}`).then(r => r.data),
+    staleTime: 60_000,
+    enabled: !!id,
+  });
+}
+
+export function useGuildStats() {
+  return useQuery({
+    queryKey: ['game', 'guildStats'],
+    queryFn: () => api.get('/game/guilds/stats').then(r => r.data),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateGuild() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fields }) => api.put(`/game/guilds/${id}`, { fields }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game'] }),
+  });
+}

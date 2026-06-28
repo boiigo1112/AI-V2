@@ -398,7 +398,62 @@ func (h *GameHandler) ListAllTables(c *gin.Context) {
 		}
 		result = append(result, ti)
 	}
-	c.JSON(http.StatusOK, gin.H{"tables": result})
+	c.JSON(http.StatusOK, result)
+}
+
+// ======================== Guild Handlers ========================
+
+func (h *GameHandler) ListGuilds(c *gin.Context) {
+	search := c.Query("search")
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	guilds, total, err := h.svc.ListGuilds(search, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if guilds == nil {
+		guilds = []map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"guilds": guilds, "total": total})
+}
+
+func (h *GameHandler) GetGuildDetail(c *gin.Context) {
+	id := c.Param("id")
+	guild, err := h.svc.GetGuildDetail(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, guild)
+}
+
+func (h *GameHandler) UpdateGuild(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Fields map[string]interface{} `json:"fields" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+	if err := h.svc.UpdateGuild(id, req.Fields); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "อัปเดตกิดล์สำเร็จ"})
+}
+
+func (h *GameHandler) GuildStats(c *gin.Context) {
+	stats, err := h.svc.GuildStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
 }
 
 func (h *GameHandler) ListAllCharacters(c *gin.Context) {

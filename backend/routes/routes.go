@@ -40,6 +40,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	ih := handlers.NewInstallHandler(cfg.JWTSecret)
 	gh := handlers.NewGameHandler(gameSvc)
 	ch := handlers.NewCouponHandler(couponSvc)
+	invh := handlers.NewInventoryHandler(gameSvc)
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -146,6 +147,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.GET("/game-stats", gh.GameStats)
 				game.GET("/top-points", gh.ListTopPoints)
 				game.GET("/top-money", gh.ListTopMoney)
+				game.GET("/inventory/:chaNum", invh.GetInventory)
+				game.DELETE("/inventory/:chaNum/item/:slotIdx", invh.DeleteInventoryItem)
+				game.POST("/inventory/:chaNum/item", invh.AddInventoryItem)
+				game.GET("/items/search", invh.SearchItems)
 			}
 
 			// Coupon routes

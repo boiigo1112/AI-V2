@@ -517,3 +517,37 @@ export function useTopMoney(limit = 10) {
     staleTime: 30_000,
   });
 }
+
+export function useCharacterInventory(chaNum) {
+  return useQuery({
+    queryKey: ['game', 'inventory', chaNum],
+    queryFn: () => api.get(`/game/inventory/${chaNum}`).then(r => r.data),
+    enabled: !!chaNum,
+    staleTime: 30_000,
+  });
+}
+
+export function useDeleteInventoryItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ chaNum, col, slotIdx }) => api.delete(`/game/inventory/${chaNum}/item/${slotIdx}`, { params: { col } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'inventory'] }),
+  });
+}
+
+export function useAddInventoryItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ chaNum, ...data }) => api.post(`/game/inventory/${chaNum}/item`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['game', 'inventory'] }),
+  });
+}
+
+export function useSearchItems(q, limit = 50) {
+  return useQuery({
+    queryKey: ['game', 'items', 'search', q, limit],
+    queryFn: () => api.get('/game/items/search', { params: { q, limit } }).then(r => r.data),
+    enabled: !!q && q.length > 0,
+    staleTime: 5_000,
+  });
+}

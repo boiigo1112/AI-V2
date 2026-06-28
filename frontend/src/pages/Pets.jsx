@@ -1,27 +1,30 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, PawPrint, Loader2, Pencil, Heart } from 'lucide-react';
+import { toast } from 'sonner';
 import { usePets, usePetDetail, usePetStats, useUpdatePet } from '@/hooks/use-game';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GlassCard } from '@/components/game/GlassCard';
 import { AnimatedCounter } from '@/components/game/AnimatedCounter';
+import { CustomSelect } from '@/components/game/CustomSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
+const PAGE_OPTIONS = [10, 25, 50, 100, 200];
 const fmt = (v) => v === null || v === undefined ? '—' : typeof v === 'number' ? v.toLocaleString() : String(v);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 function Pets() {
-  const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
   const [selected, setSelected] = useState(null);
   const [editPet, setEditPet] = useState(null);
   const [editForm, setEditForm] = useState({});
-  const limit = 50;
 
-  const { data: petsData, isLoading } = usePets({ search, limit, offset });
-  const { data: detail } = usePetDetail(selected);
+  const { data: petsData, isLoading } = usePets({ search, limit: pageSize, offset });
+  const { data: detail, isFetching: detailLoading } = usePetDetail(selected);
   const { data: stats } = usePetStats();
   const updatePet = useUpdatePet();
 
@@ -38,11 +41,14 @@ function Pets() {
   const handleSave = async () => {
     try {
       await updatePet.mutateAsync({ id: editPet.PetNum, fields: editForm });
+      toast.success('อัปเดตสัตว์เลี้ยงสำเร็จ');
       setEditPet(null);
-    } catch {
-      setEditPet(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'อัปเดตไม่สำเร็จ');
     }
   };
+
+  const handlePageSizeChange = (size) => { setPageSize(size); setOffset(0); };
 
   return (
     <div className="flex flex-col gap-5">
@@ -81,6 +87,14 @@ function Pets() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="lg:col-span-3">
           <GlassCard className="overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-foreground">รายชื่อสัตว์เลี้ยง</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">แสดง</span>
+                <CustomSelect value={pageSize} onChange={handlePageSizeChange}
+                  options={PAGE_OPTIONS.map(v => ({ value: v, label: String(v) }))} className="w-14" />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               {isLoading ? (
                 <div className="p-6 space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
@@ -107,10 +121,7 @@ function Pets() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <div className="size-7 rounded-lg bg-gold/10 flex items-center justify-center text-xs font-bold text-gold">{p.PetName?.charAt(0) || '?'}</div>
-                            <div>
-                              <p className="text-sm font-medium text-foreground">{p.PetName}</p>
-                              <p className="text-[10px] text-muted-foreground">#{p.PetNum}</p>
-                            </div>
+                            <div><p className="text-sm font-medium text-foreground">{p.PetName}</p><p className="text-[10px] text-muted-foreground">#{p.PetNum}</p></div>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{p.owner_name || `Char #${p.PetChaNum}`}</td>
@@ -130,11 +141,11 @@ function Pets() {
                 </table>
               )}
             </div>
-            {total > limit && (
+            {total > pageSize && (
               <div className="flex justify-between p-4 border-t border-white/[0.05]">
-                <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - limit))}>ก่อนหน้า</Button>
-                <span className="text-xs text-muted-foreground self-center">{offset + 1}-{Math.min(offset + limit, total)} / {total}</span>
-                <Button variant="outline" size="sm" disabled={offset + limit >= total} onClick={() => setOffset(o => o + limit)}>ถัดไป</Button>
+                <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - pageSize))}>ก่อนหน้า</Button>
+                <span className="text-xs text-muted-foreground self-center">{offset + 1}-{Math.min(offset + pageSize, total)} / {total}</span>
+                <Button variant="outline" size="sm" disabled={offset + pageSize >= total} onClick={() => setOffset(o => o + pageSize)}>ถัดไป</Button>
               </div>
             )}
           </GlassCard>
@@ -142,7 +153,8 @@ function Pets() {
 
         <div className="lg:col-span-2">
           {detail ? (
-            <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+            <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-4 relative">
+              {detailLoading && <Loader2 className="w-4 h-4 animate-spin text-gold absolute top-0 right-0" />}
               <GlassCard>
                 <div className="p-4">
                   <div className="flex items-center gap-3 mb-3">
@@ -151,6 +163,7 @@ function Pets() {
                       <p className="text-base font-semibold text-foreground">{detail.PetName}</p>
                       <p className="text-xs text-muted-foreground">#{detail.PetNum} · Owner: {detail.owner_name || `Char #${detail.PetChaNum}`}</p>
                     </div>
+                    {detailLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gold ml-auto" />}
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
                     {[

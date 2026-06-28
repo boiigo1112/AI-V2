@@ -21,6 +21,7 @@ const routeMap = {
   '/game/shop': { title: 'Shop', section: 'Game Data' },
   '/game/logs': { title: 'Logs', section: 'Game Data' },
   '/game/status': { title: 'Connection', section: 'Game Data' },
+  '/game/player-security': { title: 'Player Security', section: 'Game Data' },
 };
 
 function Header() {

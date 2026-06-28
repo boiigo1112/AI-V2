@@ -324,6 +324,7 @@ export function usePKRanking(params = {}) {
     queryKey: ['game', 'pk', 'ranking', limit, offset],
     queryFn: () => api.get('/game/pk-ranking', { params: { limit, offset } }).then(r => r.data),
     staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 
@@ -333,6 +334,7 @@ export function usePKDeathRanking(params = {}) {
     queryKey: ['game', 'pk', 'death', limit, offset],
     queryFn: () => api.get('/game/pk-ranking/death', { params: { limit, offset } }).then(r => r.data),
     staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 
@@ -351,5 +353,69 @@ export function usePKRecordHistory(id, params = {}) {
     queryFn: () => api.get(`/game/pk-ranking/${id}`, { params: { limit, offset } }).then(r => r.data),
     staleTime: 30_000,
     enabled: !!id,
+  });
+}
+
+// ======================== Player Security ========================
+
+export function useSecurityInfo(uid) {
+  return useQuery({
+    queryKey: ['game', 'security', 'info', uid],
+    queryFn: () => api.get('/game/player-security', { params: { uid } }).then(r => r.data),
+    enabled: !!uid,
+    staleTime: 30_000,
+  });
+}
+
+export function useLoginLogs(uid, params = {}) {
+  const { limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'security', 'login-logs', uid, limit, offset],
+    queryFn: () => api.get('/game/player-security/login-logs', { params: { uid, limit, offset } }).then(r => r.data),
+    enabled: !!uid,
+    staleTime: 30_000,
+  });
+}
+
+export function useDeviceChecks(uid, params = {}) {
+  const { limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'security', 'device-checks', uid, limit, offset],
+    queryFn: () => api.get('/game/player-security/device-checks', { params: { uid, limit, offset } }).then(r => r.data),
+    enabled: !!uid,
+    staleTime: 30_000,
+  });
+}
+
+export function useBlockHistory(uid) {
+  return useQuery({
+    queryKey: ['game', 'security', 'block-history', uid],
+    queryFn: () => api.get('/game/player-security/block-history', { params: { uid } }).then(r => r.data),
+    enabled: !!uid,
+    staleTime: 30_000,
+  });
+}
+
+export function useBanIP() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/player-security/ban-ip', data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'security'] }); qc.invalidateQueries({ queryKey: ['game', 'players'] }); },
+  });
+}
+
+export function useBanPC() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/player-security/ban-pc', data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'security'] }); qc.invalidateQueries({ queryKey: ['game', 'players'] }); },
+  });
+}
+
+export function useUnban() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/player-security/unban', data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'security'] }); qc.invalidateQueries({ queryKey: ['game', 'players'] }); },
   });
 }

@@ -770,9 +770,7 @@ func (s *GameService) ListGuildWarriors(guNum string) ([]map[string]interface{},
 
 func (s *GameService) ListPets(search string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, 0, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
 
 	where := ""
 	if search != "" {
@@ -783,110 +781,47 @@ func (s *GameService) ListPets(search string, limit, offset int) ([]map[string]i
 	var total int
 	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo]" + where).Scan(&total)
 
-	query := fmt.Sprintf("SELECT p.[PetNum],p.[PetName],p.[PetChaNum],p.[PetType],p.[PetStyle],p.[PetColor],p.[PetFull],p.[PetDeleted],p.[PetCreateDate],c.[ChaName] as owner_name FROM [RanGame1]..[PetInfo] p LEFT JOIN [RanGame1]..[ChaInfo] c ON p.[PetChaNum] = c.[ChaNum]%s ORDER BY p.[PetCreateDate] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", where, offset, limit)
+	query := fmt.Sprintf("SELECT p.[PetNum],p.[PetName],p.[PetChaNum],p.[PetType],p.[PetStyle],p.[PetColor],p.[PetFull],p.[PetDeleted],p.[PetCreateDate],p.[PetCardMID],p.[PetUniqueNum],p.[PetSkinScale],c.[ChaName] as owner_name FROM [RanGame1]..[PetInfo] p LEFT JOIN [RanGame1]..[ChaInfo] c ON p.[PetChaNum] = c.[ChaNum]%s ORDER BY p.[PetCreateDate] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", where, offset, limit)
 	rows, err := gdb.DB.Query(query)
-	if err != nil {
-		return []map[string]interface{}{}, total, nil
-	}
+	if err != nil { return []map[string]interface{}{}, total, nil }
 	defer rows.Close()
 
-	cols, _ := rows.Columns()
-	var results []map[string]interface{}
-	for rows.Next() {
-		vals := make([]interface{}, len(cols))
-		ptrs := make([]interface{}, len(cols))
-		for i := range vals {
-			ptrs[i] = &vals[i]
-		}
-		if err := rows.Scan(ptrs...); err != nil {
-			continue
-		}
-		row := make(map[string]interface{})
-		for i, col := range cols {
-			val := vals[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-	return results, total, nil
+	return scanRows(rows), total, nil
 }
 
 func (s *GameService) GetPetDetail(petNum string) (map[string]interface{}, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
 
 	petNum = sanitizeInt(petNum)
-	if petNum == "0" {
-		return nil, fmt.Errorf("invalid pet id")
-	}
+	if petNum == "0" { return nil, fmt.Errorf("invalid pet id") }
 
-	query := fmt.Sprintf("SELECT * FROM [RanGame1]..[PetInfo] WHERE [PetNum] = %s", petNum)
+	query := fmt.Sprintf("SELECT [PetNum],[PetName],[PetChaNum],[PetType],[PetMID],[PetSID],[PetStyle],[PetColor],[PetFull],[PetDualSkill],[PetDeleted],[PetCreateDate],[PetDeletedDate],[PetCardMID],[PetCardSID],[PetUniqueNum],[PetSkinStartDate],[PetSkinTime],[PetSkinScale],[PetSkinMID],[PetSkinSID] FROM [RanGame1]..[PetInfo] WHERE [PetNum] = %s", petNum)
 	rows, err := gdb.DB.Query(query)
-	if err != nil {
-		return nil, err
-	}
+	if err != nil { return nil, err }
 	defer rows.Close()
-	if !rows.Next() {
-		return nil, fmt.Errorf("not found")
-	}
 
-	cols, _ := rows.Columns()
-	vals := make([]interface{}, len(cols))
-	ptrs := make([]interface{}, len(cols))
-	for i := range vals {
-		ptrs[i] = &vals[i]
-	}
-	if err := rows.Scan(ptrs...); err != nil {
-		return nil, err
-	}
-	pet := make(map[string]interface{})
-	for i, col := range cols {
-		val := vals[i]
-		if b, ok := val.([]byte); ok {
-			pet[col] = string(b)
-		} else {
-			pet[col] = val
+	result := scanRows(rows)
+	if len(result) == 0 { return nil, fmt.Errorf("pet not found") }
+	pet := result[0]
+
+	// owner_name
+	if chaNum, ok := pet["PetChaNum"]; ok {
+		cn := sanitizeInt(fmt.Sprintf("%v", chaNum))
+		if cn != "0" {
+			var ownerName string
+			gdb.DB.QueryRow("SELECT [ChaName] FROM [RanGame1]..[ChaInfo] WHERE [ChaNum] = " + cn).Scan(&ownerName)
+			pet["owner_name"] = ownerName
 		}
 	}
 
-	var ownerName string
-	gdb.DB.QueryRow("SELECT [ChaName] FROM [RanGame1]..[ChaInfo] WHERE [ChaNum] = %v", pet["PetChaNum"]).Scan(&ownerName)
-	pet["owner_name"] = ownerName
-
-	// Get inventory
-	invenRows, err := gdb.DB.Query("SELECT [PetInvenNum],[PetNum],[PetInvenType],[PetInvenMID],[PetInvenSID],[PetInvenCMID],[PetInvenCSID],[PetInvenAvailable] FROM [RanGame1]..[PetInven] WHERE [PetNum] = " + petNum)
+	// Inventory
+	invenRows, err := gdb.DB.Query("SELECT [PetInvenNum],[PetNum],[PetInvenType],[PetInvenMID],[PetInvenSID],[PetInvenCMID],[PetInvenCSID],[PetInvenAvailable],[PetInvenUpdateDate],[PetChaNum] FROM [RanGame1]..[PetInven] WHERE [PetNum] = " + petNum)
 	if err == nil {
 		defer invenRows.Close()
-		invCols, _ := invenRows.Columns()
-		var inven []map[string]interface{}
-		for invenRows.Next() {
-			iv := make([]interface{}, len(invCols))
-			ip := make([]interface{}, len(invCols))
-			for i := range iv {
-				ip[i] = &iv[i]
-			}
-			if err := invenRows.Scan(ip...); err != nil {
-				continue
-			}
-			item := make(map[string]interface{})
-			for i, col := range invCols {
-				val := iv[i]
-				if b, ok := val.([]byte); ok {
-					item[col] = string(b)
-				} else {
-					item[col] = val
-				}
-			}
-			inven = append(inven, item)
-		}
-		pet["inventory"] = inven
+		pet["inventory"] = scanRows(invenRows)
 	}
+
 	return pet, nil
 }
 
@@ -934,63 +869,29 @@ func (s *GameService) UpdatePet(petNum string, fields map[string]interface{}) er
 
 func (s *GameService) PetStats() (map[string]interface{}, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
 
 	var total, available, deleted int
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo]").Scan(&total)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo] WHERE [PetDeleted] = 0").Scan(&available)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[PetInfo] WHERE [PetDeleted] = 1").Scan(&deleted)
+	gdb.DB.QueryRow("SELECT ISNULL(SUM(CASE WHEN [PetDeleted] = 0 THEN 1 ELSE 0 END), 0), ISNULL(SUM(CASE WHEN [PetDeleted] = 1 THEN 1 ELSE 0 END), 0), COUNT(*) FROM [RanGame1]..[PetInfo]").Scan(&available, &deleted, &total)
 
-	return map[string]interface{}{
-		"total":     total,
-		"available": available,
-		"deleted":   deleted,
-	}, nil
+	return map[string]interface{}{"total": total, "available": available, "deleted": deleted}, nil
 }
 
 // ======================== PK Ranking Services ========================
 
 func (s *GameService) PKRanking(limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, 0, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
 
 	var total int
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0").Scan(&total)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaPK] > 0").Scan(&total)
 
-	query := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaPK],[ChaPKScore],[ChaPKDeath],[ChaOnline] FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0 ORDER BY [ChaPKScore] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", offset, limit)
+	query := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaPK],[ChaPKScore],[ChaPKDeath],[ChaOnline] FROM [RanGame1]..[ChaInfo] WHERE [ChaPK] > 0 ORDER BY [ChaPK] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", offset, limit)
 	rows, err := gdb.DB.Query(query)
-	if err != nil {
-		return []map[string]interface{}{}, total, nil
-	}
+	if err != nil { return []map[string]interface{}{}, total, nil }
 	defer rows.Close()
 
-	cols, _ := rows.Columns()
-	var results []map[string]interface{}
-	for rows.Next() {
-		vals := make([]interface{}, len(cols))
-		ptrs := make([]interface{}, len(cols))
-		for i := range vals {
-			ptrs[i] = &vals[i]
-		}
-		if err := rows.Scan(ptrs...); err != nil {
-			continue
-		}
-		row := make(map[string]interface{})
-		for i, col := range cols {
-			val := vals[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-	return results, total, nil
+	return scanRows(rows), total, nil
 }
 
 func (s *GameService) PKDeathRanking(limit, offset int) ([]map[string]interface{}, int, error) {
@@ -1009,29 +910,7 @@ func (s *GameService) PKDeathRanking(limit, offset int) ([]map[string]interface{
 	}
 	defer rows.Close()
 
-	cols, _ := rows.Columns()
-	var results []map[string]interface{}
-	for rows.Next() {
-		vals := make([]interface{}, len(cols))
-		ptrs := make([]interface{}, len(cols))
-		for i := range vals {
-			ptrs[i] = &vals[i]
-		}
-		if err := rows.Scan(ptrs...); err != nil {
-			continue
-		}
-		row := make(map[string]interface{})
-		for i, col := range cols {
-			val := vals[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-	return results, total, nil
+	return scanRows(rows), total, nil
 }
 
 func (s *GameService) PKStats() (map[string]interface{}, error) {
@@ -1042,17 +921,17 @@ func (s *GameService) PKStats() (map[string]interface{}, error) {
 
 	var totalPlayers, totalPK int
 	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo]").Scan(&totalPlayers)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0").Scan(&totalPK)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaPK] > 0").Scan(&totalPK)
 
 	var avgPK, maxPK float64
-	gdb.DB.QueryRow("SELECT ISNULL(AVG(CAST([ChaPKScore] AS FLOAT)), 0) FROM [RanGame1]..[ChaInfo] WHERE [ChaPKScore] > 0").Scan(&avgPK)
-	gdb.DB.QueryRow("SELECT ISNULL(MAX([ChaPKScore]), 0) FROM [RanGame1]..[ChaInfo]").Scan(&maxPK)
+	gdb.DB.QueryRow("SELECT ISNULL(AVG(CAST([ChaPK] AS FLOAT)), 0) FROM [RanGame1]..[ChaInfo] WHERE [ChaPK] > 0").Scan(&avgPK)
+	gdb.DB.QueryRow("SELECT ISNULL(MAX([ChaPK]), 0) FROM [RanGame1]..[ChaInfo]").Scan(&maxPK)
 
 	return map[string]interface{}{
 		"total_players": totalPlayers,
 		"total_pk":      totalPK,
-		"avg_pk_score":  int(avgPK),
-		"max_pk_score":  int(maxPK),
+		"avg_pk_score":  avgPK,
+		"max_pk_score":  maxPK,
 	}, nil
 }
 
@@ -1077,29 +956,212 @@ func (s *GameService) PKRecordHistory(chaNum string, limit, offset int) ([]map[s
 	}
 	defer rows.Close()
 
+	return scanRows(rows), total, nil
+}
+
+// ======================== Player Security Services ========================
+
+func (s *GameService) GetSecurityInfo(uid string) (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var userNum int
+	var lastIP, userPCID, userPCIDHWID, userPCIDMAC, lastLogin sql.NullString
+	var loginState sql.NullInt64
+
+	err := gdb.DB.QueryRow("SELECT [UserNum],[LastIP],[UserPCID],[UserPCIDHWID],[UserPCIDMAC],[LastLoginDate],[UserLoginState] FROM [RanUser]..[UserInfo] WHERE [UserID] = '" + sanitizeSearch(uid) + "'").Scan(
+		&userNum, &lastIP, &userPCID, &userPCIDHWID, &userPCIDMAC, &lastLogin, &loginState)
+	if err != nil {
+		return nil, fmt.Errorf("ไม่พบผู้ใช้")
+	}
+
+	// Trim trailing spaces from MSSQL varchar
+	trimIP := strVal(lastIP)
+	trimHWID := strVal(userPCIDHWID)
+	trimMAC := strVal(userPCIDMAC)
+	trimPCID := strVal(userPCID)
+
+	result := map[string]interface{}{
+		"user_num":     userNum,
+		"last_ip":      trimIP,
+		"pc_id":        trimPCID,
+		"hwid":         trimHWID,
+		"mac":          trimMAC,
+		"last_login":   strVal(lastLogin),
+		"login_state":  intVal(loginState),
+	}
+
+	return result, nil
+}
+
+func nullStr(n sql.NullString) interface{} {
+	if n.Valid { return n.String }
+	return nil
+}
+func nullInt(n sql.NullInt64) interface{} {
+	if n.Valid { return n.Int64 }
+	return nil
+}
+
+func strVal(n sql.NullString) string {
+	if n.Valid { return strings.TrimSpace(n.String) }
+	return ""
+}
+func intVal(n sql.NullInt64) int64 {
+	if n.Valid { return n.Int64 }
+	return 0
+}
+
+func scanRows(rows *sql.Rows) []map[string]interface{} {
 	cols, _ := rows.Columns()
 	var results []map[string]interface{}
 	for rows.Next() {
 		vals := make([]interface{}, len(cols))
 		ptrs := make([]interface{}, len(cols))
-		for i := range vals {
-			ptrs[i] = &vals[i]
-		}
-		if err := rows.Scan(ptrs...); err != nil {
-			continue
-		}
+		for i := range vals { ptrs[i] = &vals[i] }
+		if err := rows.Scan(ptrs...); err != nil { continue }
 		row := make(map[string]interface{})
 		for i, col := range cols {
 			val := vals[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
+			if b, ok := val.([]byte); ok { row[col] = strings.TrimSpace(string(b)) } else { row[col] = val }
 		}
 		results = append(results, row)
 	}
-	return results, total, nil
+	return results
+}
+
+func (s *GameService) GetLoginLogs(uid string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
+
+	var userNum int
+	err := gdb.DB.QueryRow("SELECT [UserNum] FROM [RanUser]..[UserInfo] WHERE [UserID] = '"+sanitizeSearch(uid)+"'").Scan(&userNum)
+	if err != nil { return nil, 0, fmt.Errorf("ไม่พบผู้ใช้") }
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[LogLogin] WHERE [UserNum] = " + fmt.Sprintf("%d", userNum)).Scan(&total)
+
+	query := fmt.Sprintf("SELECT [LoginNum],[LogInOut],[LogDate],[LogIpAddress],[LogHWID],[LogMAC],[LogPCID] FROM [RanUser]..[LogLogin] WHERE [UserNum] = %d ORDER BY [LogDate] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", userNum, offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return []map[string]interface{}{}, total, nil }
+	defer rows.Close()
+
+	return scanRows(rows), total, nil
+}
+
+func (s *GameService) GetDeviceChecks(uid string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
+
+	var userNum int
+	err := gdb.DB.QueryRow("SELECT [UserNum] FROM [RanUser]..[UserInfo] WHERE [UserID] = '"+sanitizeSearch(uid)+"'").Scan(&userNum)
+	if err != nil { return nil, 0, fmt.Errorf("ไม่พบผู้ใช้") }
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[LogLoginDeviceCheck] WHERE [UserNum] = " + fmt.Sprintf("%d", userNum)).Scan(&total)
+
+	query := fmt.Sprintf("SELECT [PrevIP],[NewIP],[PrevPCIDHWID],[NewPCIDHWID],[Date] FROM [RanUser]..[LogLoginDeviceCheck] WHERE [UserNum] = %d ORDER BY [Date] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", userNum, offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return []map[string]interface{}{}, total, nil }
+	defer rows.Close()
+
+	return scanRows(rows), total, nil
+}
+
+func (s *GameService) GetBlockHistory(uid string) ([]map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil {
+		return nil, fmt.Errorf("game database not connected")
+	}
+
+	var userNum int
+	var lastIP, userPCIDHWID, userPCIDMAC sql.NullString
+	err := gdb.DB.QueryRow("SELECT [UserNum],[LastIP],[UserPCIDHWID],[UserPCIDMAC] FROM [RanUser]..[UserInfo] WHERE [UserID] = '"+sanitizeSearch(uid)+"'").Scan(&userNum, &lastIP, &userPCIDHWID, &userPCIDMAC)
+	if err != nil {
+		return nil, fmt.Errorf("ไม่พบผู้ใช้")
+	}
+
+	var results []map[string]interface{}
+
+	// Query BlockAddress by user's last IP
+	ip := strVal(lastIP)
+	if ip != "" {
+		ipRows, err := gdb.DB.Query("SELECT [BlockAddress],[BlockReason],[BlockDate] FROM [RanUser]..[BlockAddress] WHERE [BlockAddress] = '" + sanitizeSearch(ip) + "'")
+		if err == nil {
+			defer ipRows.Close()
+			for ipRows.Next() {
+				var addr, reason string
+				var date time.Time
+				if err := ipRows.Scan(&addr, &reason, &date); err != nil { continue }
+				results = append(results, map[string]interface{}{"type": "IP", "value": strings.TrimSpace(addr), "reason": reason, "date": date})
+			}
+		}
+	}
+
+	// Query BlockPCID by user's HWID
+	hwid := strVal(userPCIDHWID)
+	if hwid != "" {
+		hwidRows, err := gdb.DB.Query("SELECT [BlockHWID],[BlockReason],[BlockDate] FROM [RanUser]..[BlockPCID] WHERE [BlockHWID] = '"+sanitizeSearch(hwid)+"'")
+		if err == nil {
+			defer hwidRows.Close()
+			for hwidRows.Next() {
+				var hwidVal, reason string
+				var date time.Time
+				if err := hwidRows.Scan(&hwidVal, &reason, &date); err != nil { continue }
+				results = append(results, map[string]interface{}{"type": "HWID", "value": strings.TrimSpace(hwidVal), "reason": reason, "date": date})
+			}
+		}
+	}
+
+	// Query BlockPCID by user's MAC
+	mac := strVal(userPCIDMAC)
+	if mac != "" {
+		macRows, err := gdb.DB.Query("SELECT [BlockMAC],[BlockReason],[BlockDate] FROM [RanUser]..[BlockPCID] WHERE [BlockMAC] = '"+sanitizeSearch(mac)+"'")
+		if err == nil {
+			defer macRows.Close()
+			for macRows.Next() {
+				var macVal, reason string
+				var date time.Time
+				if err := macRows.Scan(&macVal, &reason, &date); err != nil { continue }
+				results = append(results, map[string]interface{}{"type": "MAC", "value": strings.TrimSpace(macVal), "reason": reason, "date": date})
+			}
+		}
+	}
+
+	return results, nil
+}
+
+func (s *GameService) BanIP(ip, reason string) error {
+	gdb := s.GetDB()
+	if gdb == nil { return fmt.Errorf("game database not connected") }
+	_, err := gdb.DB.Exec("INSERT INTO [RanUser]..[BlockAddress] ([BlockAddress], [BlockReason], [BlockDate]) VALUES ('" + sanitizeSearch(strings.TrimSpace(ip)) + "', '" + sanitizeSearch(reason) + "', GETDATE())")
+	return err
+}
+
+func (s *GameService) BanPC(hwid, reason string) error {
+	gdb := s.GetDB()
+	if gdb == nil { return fmt.Errorf("game database not connected") }
+	_, err := gdb.DB.Exec("INSERT INTO [RanUser]..[BlockPCID] ([BlockHWID], [BlockReason], [BlockDate]) VALUES ('" + sanitizeSearch(strings.TrimSpace(hwid)) + "', '" + sanitizeSearch(reason) + "', GETDATE())")
+	return err
+}
+
+func (s *GameService) Unban(value, banType string) error {
+	gdb := s.GetDB()
+	if gdb == nil { return fmt.Errorf("game database not connected") }
+	safe := sanitizeSearch(value)
+	var query string
+	switch banType {
+	case "ip":
+		query = "DELETE FROM [RanUser]..[BlockAddress] WHERE [BlockAddress] = '" + safe + "'"
+	case "mac":
+		query = "DELETE FROM [RanUser]..[BlockPCID] WHERE [BlockMAC] = '" + safe + "'"
+	default:
+		query = "DELETE FROM [RanUser]..[BlockPCID] WHERE [BlockHWID] = '" + safe + "'"
+	}
+	_, err := gdb.DB.Exec(query)
+	return err
 }
 
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
@@ -1140,109 +1202,65 @@ func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax,
 		return nil, 0, err
 	}
 
-	dataQuery := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaSchool],[ChaTribe],[ChaReborn],[ChaMoney],[ChaExp],[ChaPower],[ChaOnline],[UserNum] FROM [RanGame1]..[ChaInfo] %s ORDER BY [ChaLevel] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", whereStr, offset, limit)
+	dataQuery := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaSchool],[ChaTribe],[ChaReborn],[ChaMoney],[ChaExp],[ChaPower],[ChaDex],[ChaSpirit],[ChaStrong],[ChaIntel],[ChaHP],[ChaMP],[ChaPK],[ChaPKScore],[ChaPKDeath],[ChaOnline],[ChaDeleted],[UserNum] FROM [RanGame1]..[ChaInfo] %s ORDER BY [ChaLevel] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", whereStr, offset, limit)
 	rows, err := gdb.DB.Query(dataQuery)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer rows.Close()
 
-	columns, _ := rows.Columns()
-	var results []map[string]interface{}
-	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-		if err := rows.Scan(valuePtrs...); err != nil {
-			continue
-		}
-		row := make(map[string]interface{})
-		for i, col := range columns {
-			val := values[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-	return results, total, nil
+	return scanRows(rows), total, nil
 }
 
 func (s *GameService) GetCharacterDetail(chanum string) (map[string]interface{}, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
 
 	chanum = sanitizeInt(chanum)
-	if chanum == "0" {
-		return nil, fmt.Errorf("invalid character id")
-	}
+	if chanum == "0" { return nil, fmt.Errorf("invalid character id") }
 
-	query := fmt.Sprintf("SELECT * FROM [RanGame1]..[ChaInfo] WHERE [ChaNum] = %s", chanum)
+	query := fmt.Sprintf("SELECT [ChaNum],[ChaName],[ChaLevel],[ChaClass],[ChaSchool],[ChaTribe],[ChaReborn],[ChaMoney],[ChaExp],[ChaPower],[ChaDex],[ChaSpirit],[ChaStrong],[ChaIntel],[ChaHP],[ChaMP],[ChaPK],[ChaPKScore],[ChaPKDeath],[ChaOnline],[ChaDeleted],[UserNum] FROM [RanGame1]..[ChaInfo] WHERE [ChaNum] = %s", chanum)
 	rows, err := gdb.DB.Query(query)
-	if err != nil {
-		return nil, err
-	}
+	if err != nil { return nil, err }
 	defer rows.Close()
 
-	if !rows.Next() {
-		return nil, fmt.Errorf("character not found")
-	}
-
-	columns, _ := rows.Columns()
-	values := make([]interface{}, len(columns))
-	valuePtrs := make([]interface{}, len(columns))
-	for i := range values {
-		valuePtrs[i] = &values[i]
-	}
-	if err := rows.Scan(valuePtrs...); err != nil {
-		return nil, err
-	}
-
-	row := make(map[string]interface{})
-	for i, col := range columns {
-		val := values[i]
-		if b, ok := val.([]byte); ok {
-			row[col] = string(b)
-		} else {
-			row[col] = val
-		}
-	}
-	return row, nil
+	result := scanRows(rows)
+	if len(result) == 0 { return nil, fmt.Errorf("character not found") }
+	return result[0], nil
 }
 
 func (s *GameService) CharacterStats() (map[string]interface{}, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, fmt.Errorf("game database not connected")
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
+
+	stats := map[string]interface{}{
+		"total": 0, "online": 0, "offline": 0,
+		"buster": 0, "tempster": 0, "engineer": 0, "prowler": 0,
+		"force_gunner": 0, "defender": 0, "force_blader": 0,
+		"force_shuriken": 0, "bloody_storm": 0, "shadow_walker": 0,
 	}
 
-	var total, online, buster, tempster, engineer, prowler, forceGunner, defender int
+	var total int
 	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo]").Scan(&total)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaOnline] = 1").Scan(&online)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 1").Scan(&buster)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 2").Scan(&tempster)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 3").Scan(&engineer)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 4").Scan(&prowler)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 5").Scan(&forceGunner)
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaClass] = 6").Scan(&defender)
+	stats["total"] = total
 
-	return map[string]interface{}{
-		"total":       total,
-		"online":      online,
-		"offline":     total - online,
-		"buster":      buster,
-		"tempster":    tempster,
-		"engineer":    engineer,
-		"prowler":     prowler,
-		"force_gunner": forceGunner,
-		"defender":    defender,
-	}, nil
+	var online int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanGame1]..[ChaInfo] WHERE [ChaOnline] = 1").Scan(&online)
+	stats["online"] = online
+	stats["offline"] = total - online
+
+	rows, err := gdb.DB.Query("SELECT [ChaClass], COUNT(*) AS cnt FROM [RanGame1]..[ChaInfo] GROUP BY [ChaClass]")
+	if err != nil { return stats, nil }
+	defer rows.Close()
+
+	classKey := map[int]string{1: "buster", 2: "tempster", 3: "engineer", 4: "prowler", 5: "force_gunner", 6: "defender", 7: "force_blader", 8: "force_shuriken", 9: "bloody_storm", 10: "shadow_walker"}
+
+	for rows.Next() {
+		var classID, cnt int
+		if err := rows.Scan(&classID, &cnt); err != nil { continue }
+		if key, ok := classKey[classID]; ok { stats[key] = cnt }
+	}
+	return stats, nil
 }
 
 func (s *GameService) BanCharacter(chanum, reason string) error {
@@ -1403,117 +1421,48 @@ func (s *GameService) Query(dbName, query string, args ...interface{}) ([]map[st
 
 func (s *GameService) ListPlayers(tableName, searchCol, search string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, 0, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
 
 	userNumCol, _ := s.GetActualColumn(tableName, "UserNum")
+	if userNumCol == "" { userNumCol = "UserNum" }
 	userIDCol, _ := s.GetActualColumn(tableName, "UserID")
+	if userIDCol == "" { userIDCol = "UserID" }
 
-	if userNumCol == "" {
-		userNumCol = "UserNum"
-	}
-	if userIDCol == "" {
-		userIDCol = "UserID"
+	tableRef := fmt.Sprintf("[RanUser]..[%s]", tableName)
+	whereStr := ""
+	if search != "" {
+		safeSearch := sanitizeSearch(search)
+		whereStr = fmt.Sprintf("WHERE [%s] LIKE '%%%%%s%%%%'", userIDCol, safeSearch)
 	}
 
 	var total int
-	var rows *sql.Rows
-	var err error
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s %s", tableRef, whereStr)
+	if err := gdb.DB.QueryRow(countQuery).Scan(&total); err != nil { return nil, 0, err }
 
-	tableRef := fmt.Sprintf("[RanUser]..[%s]", tableName)
-
-	if search != "" {
-		countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE [%s] LIKE '%%"+search+"%%'", tableRef, userIDCol)
-		if e := gdb.DB.QueryRow(countQuery).Scan(&total); e != nil {
-			return nil, 0, e
-		}
-		dataQuery := fmt.Sprintf("SELECT * FROM %s WHERE [%s] LIKE '%%"+search+"%%' ORDER BY [%s] DESC", tableRef, userIDCol, userNumCol)
-		rows, err = gdb.DB.Query(dataQuery)
-	} else {
-		countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableRef)
-		if e := gdb.DB.QueryRow(countQuery).Scan(&total); e != nil {
-			return nil, 0, e
-		}
-		dataQuery := fmt.Sprintf("SELECT * FROM %s ORDER BY [%s] DESC", tableRef, userNumCol)
-		rows, err = gdb.DB.Query(dataQuery)
-	}
-	if err != nil {
-		return nil, 0, err
-	}
+	dataQuery := fmt.Sprintf("SELECT [UserNum],[UserID],[UserFullName],[UserPoint],[ChaRemain],[UserBlock],[UserLoginState],[LastLoginDate],[UserIP],[UserPCIDHWID],[UserVIP] FROM %s %s ORDER BY [%s] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", tableRef, whereStr, userNumCol, offset, limit)
+	rows, err := gdb.DB.Query(dataQuery)
+	if err != nil { return []map[string]interface{}{}, total, nil }
 	defer rows.Close()
 
-	columns, _ := rows.Columns()
-	var results []map[string]interface{}
-	count := 0
-	for rows.Next() && count < offset+limit {
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-		if err := rows.Scan(valuePtrs...); err != nil {
-			continue
-		}
-		if count >= offset {
-			row := make(map[string]interface{})
-			for i, col := range columns {
-				val := values[i]
-				if b, ok := val.([]byte); ok {
-					row[col] = string(b)
-				} else {
-					row[col] = val
-				}
-			}
-			results = append(results, row)
-		}
-		count++
-	}
-	return results, total, nil
+	return scanRows(rows), total, nil
 }
 
 func (s *GameService) GetPlayer(tableName string, usernum interface{}) (map[string]interface{}, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
 
 	userNumCol, _ := s.GetActualColumn(tableName, "UserNum")
-	if userNumCol == "" {
-		userNumCol = "UserNum"
-	}
+	if userNumCol == "" { userNumCol = "UserNum" }
 
-	query := fmt.Sprintf("SELECT * FROM [RanUser]..[%s] WHERE [%s] = '%v'", tableName, userNumCol, usernum)
+	safeNum := sanitizeSearch(fmt.Sprintf("%v", usernum))
+	query := fmt.Sprintf("SELECT [UserNum],[UserID],[UserFullName],[UserPoint],[ChaRemain],[UserBlock],[UserLoginState],[LastLoginDate],[UserEmail],[UserAge],[UserVIP],[VotePoint],[UserIP],[UserPCIDHWID],[UserPCIDMAC],[UserLastLoginDate],[UserLoginDeviceCheck] FROM [RanUser]..[%s] WHERE [%s] = '%s'", tableName, userNumCol, safeNum)
 	rows, err := gdb.DB.Query(query)
-	if err != nil {
-		return nil, err
-	}
+	if err != nil { return nil, err }
 	defer rows.Close()
 
-	if !rows.Next() {
-		return nil, fmt.Errorf("player not found")
-	}
-
-	columns, _ := rows.Columns()
-	values := make([]interface{}, len(columns))
-	valuePtrs := make([]interface{}, len(columns))
-	for i := range values {
-		valuePtrs[i] = &values[i]
-	}
-	if err := rows.Scan(valuePtrs...); err != nil {
-		return nil, err
-	}
-
-	row := make(map[string]interface{})
-	for i, col := range columns {
-		val := values[i]
-		if b, ok := val.([]byte); ok {
-			row[col] = string(b)
-		} else {
-			row[col] = val
-		}
-	}
-	return row, nil
+	result := scanRows(rows)
+	if len(result) == 0 { return nil, fmt.Errorf("player not found") }
+	return result[0], nil
 }
 
 func (s *GameService) ListCharacters(usernum interface{}) ([]map[string]interface{}, error) {
@@ -1561,71 +1510,53 @@ func (s *GameService) ListCharacters(usernum interface{}) ([]map[string]interfac
 
 func (s *GameService) ListLogs(dbName, tableName string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return nil, 0, fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
 
 	safeDB := gamedatabase.SanitizeDBName(dbName)
 	safeTable := gamedatabase.SanitizeTableName(tableName)
 
-	dateCol := "LogDate"
-	for _, c := range []string{"LogDate", "ActionDate", "Date", "SessionDate", "PayDate", "GiftedAt", "CreatedDate"} {
-		cols, _ := s.getColumnNames(gdb, safeDB, safeTable)
-		for _, col := range cols {
-			if strings.EqualFold(col, c) {
-				dateCol = col
-				break
-			}
-		}
-	}
+	// Detect date column
+	dateCol := detectDateColumn(gdb, safeDB, safeTable)
 
 	var total int
 	tableRef := fmt.Sprintf("[%s]..[%s]", safeDB, safeTable)
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableRef)
-	if err := gdb.DB.QueryRow(countQuery).Scan(&total); err != nil {
-		return nil, 0, err
-	}
+	if err := gdb.DB.QueryRow(countQuery).Scan(&total); err != nil { return nil, 0, err }
 
-	dataQuery := fmt.Sprintf("SELECT * FROM %s ORDER BY [%s] DESC", tableRef, dateCol)
+	dataQuery := fmt.Sprintf("SELECT * FROM %s ORDER BY [%s] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", tableRef, dateCol, offset, limit)
 	rows, err := gdb.DB.Query(dataQuery)
-	if err != nil {
-		return nil, 0, err
-	}
+	if err != nil { return []map[string]interface{}{}, total, nil }
 	defer rows.Close()
 
-	columns, _ := rows.Columns()
-	var results []map[string]interface{}
-	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-		if err := rows.Scan(valuePtrs...); err != nil {
-			continue
-		}
-		row := make(map[string]interface{})
-		for i, col := range columns {
-			val := values[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-	return results, total, nil
+	return scanRows(rows), total, nil
 }
 
-func (s *GameService) getColumnNames(gdb *gamedatabase.GameDB, dbName, tableName string) ([]string, error) {
-	query := fmt.Sprintf("SELECT TOP 1 * FROM [%s]..[%s]", dbName, tableName)
-	rows, err := gdb.DB.Query(query)
-	if err != nil {
-		return nil, err
+func detectDateColumn(gdb *gamedatabase.GameDB, dbName, tableName string) string {
+	candidates := []string{"LogDate", "ActionDate", "Date", "SessionDate", "PayDate", "GiftedAt", "CreatedDate"}
+	cols, err := getColumnNames(gdb, dbName, tableName)
+	if err != nil { return "LogDate" }
+	colSet := make(map[string]bool, len(cols))
+	for _, c := range cols { colSet[strings.ToLower(c)] = true }
+	for _, c := range candidates {
+		if colSet[strings.ToLower(c)] { return c }
 	}
+	if len(cols) > 0 { return cols[0] }
+	return "LogDate"
+}
+
+func getColumnNames(gdb *gamedatabase.GameDB, dbName, tableName string) ([]string, error) {
+	query := fmt.Sprintf("SELECT COLUMN_NAME FROM [%s].INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '%s' ORDER BY ORDINAL_POSITION", dbName, sanitizeSearch(tableName))
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return nil, err }
 	defer rows.Close()
-	return rows.Columns()
+
+	var cols []string
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil { continue }
+		cols = append(cols, col)
+	}
+	return cols, nil
 }
 
 func (s *GameService) ListTables(dbName string) ([]string, error) {
@@ -1698,22 +1629,17 @@ func (s *GameService) GetTableColumns(dbName, tableName string) ([]map[string]in
 
 func (s *GameService) BlockPlayer(tableName, usernum, reason string) error {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return fmt.Errorf("game database not connected") }
 
 	usernum = sanitizeInt(usernum)
-	if usernum == "0" {
-		return fmt.Errorf("ไม่พบผู้เล่น")
-	}
+	if usernum == "0" { return fmt.Errorf("ไม่พบผู้เล่น") }
 
 	reason = sanitizeSearch(reason)
-	if reason == "" {
-		reason = "Banned by admin"
-	}
+	if reason == "" { reason = "Banned by admin" }
 
 	var userBlock int
-	if err := gdb.DB.QueryRow("SELECT [UserBlock] FROM [RanUser]..[UserInfo] WHERE [UserNum] = " + usernum).Scan(&userBlock); err != nil {
+	var userIP sql.NullString
+	if err := gdb.DB.QueryRow("SELECT [UserBlock],[UserIP] FROM [RanUser]..[UserInfo] WHERE [UserNum] = " + usernum).Scan(&userBlock, &userIP); err != nil {
 		return fmt.Errorf("ไม่พบผู้เล่น")
 	}
 	if userBlock == 1 {
@@ -1724,10 +1650,13 @@ func (s *GameService) BlockPlayer(tableName, usernum, reason string) error {
 		return fmt.Errorf("ไม่สามารถบล็อกได้: %v", err)
 	}
 
-	var cnt int
-	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[BlockAddress] WHERE [BlockAddress] = '" + usernum + "'").Scan(&cnt)
-	if cnt == 0 {
-		gdb.DB.Exec("INSERT INTO [RanUser]..[BlockAddress] ([BlockAddress], [BlockReason], [BlockDate]) VALUES ('" + usernum + "', '" + reason + "', GETDATE())")
+	ip := strVal(userIP)
+	if ip != "" {
+		var cnt int
+		gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[BlockAddress] WHERE [BlockAddress] = '" + sanitizeSearch(ip) + "'").Scan(&cnt)
+		if cnt == 0 {
+			gdb.DB.Exec("INSERT INTO [RanUser]..[BlockAddress] ([BlockAddress], [BlockReason], [BlockDate]) VALUES ('"+sanitizeSearch(ip)+"', '"+reason+"', GETDATE())")
+		}
 	}
 
 	return nil
@@ -1735,17 +1664,14 @@ func (s *GameService) BlockPlayer(tableName, usernum, reason string) error {
 
 func (s *GameService) UnblockPlayer(tableName, usernum string) error {
 	gdb := s.GetDB()
-	if gdb == nil {
-		return fmt.Errorf("game database not connected")
-	}
+	if gdb == nil { return fmt.Errorf("game database not connected") }
 
 	usernum = sanitizeInt(usernum)
-	if usernum == "0" {
-		return fmt.Errorf("ไม่พบผู้เล่น")
-	}
+	if usernum == "0" { return fmt.Errorf("ไม่พบผู้เล่น") }
 
 	var userBlock int
-	if err := gdb.DB.QueryRow("SELECT [UserBlock] FROM [RanUser]..[UserInfo] WHERE [UserNum] = " + usernum).Scan(&userBlock); err != nil {
+	var userIP sql.NullString
+	if err := gdb.DB.QueryRow("SELECT [UserBlock],[UserIP] FROM [RanUser]..[UserInfo] WHERE [UserNum] = " + usernum).Scan(&userBlock, &userIP); err != nil {
 		return fmt.Errorf("ไม่พบผู้เล่น")
 	}
 	if userBlock == 0 {
@@ -1756,7 +1682,11 @@ func (s *GameService) UnblockPlayer(tableName, usernum string) error {
 		return fmt.Errorf("ไม่สามารถปลดบล็อกได้: %v", err)
 	}
 
-	gdb.DB.Exec("DELETE FROM [RanUser]..[BlockAddress] WHERE [BlockAddress] = '" + usernum + "'")
+	ip := strVal(userIP)
+	if ip != "" {
+		gdb.DB.Exec("DELETE FROM [RanUser]..[BlockAddress] WHERE [BlockAddress] = '" + sanitizeSearch(ip) + "'")
+	}
+
 	return nil
 }
 
@@ -1770,12 +1700,19 @@ func (s *GameService) UpdateCharacter(chanum string, field string, value interfa
 		"ChaLevel": true, "ChaMoney": true, "ChaExp": true,
 		"ChaPower": true, "ChaDex": true, "ChaSpirit": true,
 		"ChaStrong": true, "ChaIntel": true, "ChaReborn": true,
+		"ChaHP": true, "ChaMP": true, "ChaPK": true,
 	}
 	if !allowedFields[field] {
 		return fmt.Errorf("field '%s' is not editable", field)
 	}
 
-	query := fmt.Sprintf("UPDATE [RanGame1]..[ChaInfo] SET [%s] = '%v' WHERE ChaNum = '%s'", field, value, chanum)
+	valueStr := fmt.Sprintf("%v", value)
+	valueStr = sanitizeInt(valueStr)
+	if valueStr == "" || valueStr == "0" {
+		valueStr = "0"
+	}
+
+	query := fmt.Sprintf("UPDATE [RanGame1]..[ChaInfo] SET [%s] = %s WHERE [ChaNum] = %s", field, valueStr, chanum)
 	result, err := gdb.DB.Exec(query)
 	if err != nil {
 		return err

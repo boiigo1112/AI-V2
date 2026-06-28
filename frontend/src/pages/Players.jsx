@@ -10,22 +10,19 @@ import { AnimatedCounter } from '@/components/game/AnimatedCounter';
 import { CharacterDrawer } from '@/components/game/CharacterDrawer';
 import { CharacterEditor } from '@/components/game/CharacterEditor';
 import { AccountEditor } from '@/components/game/AccountEditor';
+import { CustomSelect } from '@/components/game/CustomSelect';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+const PAGE_OPTIONS = [10, 25, 50, 100, 200];
+
 function Players() {
-  const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
-  const limit = 50;
+  const [pageSize, setPageSize] = useState(50);
 
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -34,14 +31,14 @@ function Players() {
   const [banTarget, setBanTarget] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const { data: playersData, isLoading, refetch } = useGamePlayers({ search, limit, offset });
-  const { data: playerDetail, refetch: refetchPlayer } = useGamePlayer(selectedAccount?.UserNum);
+  const { data: playersData, isLoading } = useGamePlayers({ search, limit: pageSize, offset });
+  const { data: playerDetail } = useGamePlayer(selectedAccount?.UserNum);
   const blockPlayer = useBlockPlayer();
   const unblockPlayer = useUnblockPlayer();
 
   const players = playersData?.players || [];
   const total = playersData?.total || 0;
-  const bannedCount = players.filter(p => p.UserBlock === 1).length;
+  const bannedCount = useMemo(() => players.filter(p => p.UserBlock === 1).length, [players]);
 
   const filteredPlayers = useMemo(() => {
     if (statusFilter === 'all') return players;
@@ -50,42 +47,24 @@ function Players() {
     return players;
   }, [players, statusFilter]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setSearch(searchInput);
-    setOffset(0);
-  };
+  const handleSearch = (e) => { e.preventDefault(); setSearch(searchInput); setOffset(0); };
 
-  const handleViewCharacters = (player) => {
-    setSelectedAccount(player);
-    setDrawerOpen(true);
-  };
+  const handleViewCharacters = (player) => { setSelectedAccount(player); setDrawerOpen(true); };
 
-  const handleEditAccount = (player) => {
-    setAccountEditor({ open: true, account: player });
-  };
+  const handleEditAccount = (player) => { setAccountEditor({ open: true, account: player }); };
 
   const handleBlock = async () => {
     if (!banTarget) return;
-    try {
-      await blockPlayer.mutateAsync({ id: banTarget.UserNum, reason: 'Banned by admin' });
-      toast.success('บล็อกสำเร็จ');
-      setBanTarget(null);
-      refetch();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'บล็อกไม่สำเร็จ');
-    }
+    try { await blockPlayer.mutateAsync({ id: banTarget.UserNum, reason: 'Banned by admin' }); toast.success('บล็อกสำเร็จ'); setBanTarget(null); }
+    catch (err) { toast.error(err.response?.data?.error || 'บล็อกไม่สำเร็จ'); }
   };
 
   const handleUnblock = async (id) => {
-    try {
-      await unblockPlayer.mutateAsync(id);
-      toast.success('ปลดบล็อกสำเร็จ');
-      refetch();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'ปลดบล็อกไม่สำเร็จ');
-    }
+    try { await unblockPlayer.mutateAsync(id); toast.success('ปลดบล็อกสำเร็จ'); }
+    catch (err) { toast.error(err.response?.data?.error || 'ปลดบล็อกไม่สำเร็จ'); }
   };
+
+  const handlePageSizeChange = (size) => { setPageSize(size); setOffset(0); };
 
   const formatDate = (d) => {
     if (!d || d === '0001-01-01T00:00:00Z') return '—';
@@ -96,65 +75,44 @@ function Players() {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <GlassCard className="p-4">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-blue/12 flex items-center justify-center">
-              <Users className="w-4.5 h-4.5 text-blue" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">บัญชีทั้งหมด</p>
-              <p className="text-xl font-bold text-foreground"><AnimatedCounter value={total} /></p>
-            </div>
+            <div className="size-9 rounded-xl bg-blue/12 flex items-center justify-center"><Users className="w-4.5 h-4.5 text-blue" /></div>
+            <div><p className="text-xs text-muted-foreground font-medium">บัญชีทั้งหมด</p><p className="text-xl font-bold text-foreground"><AnimatedCounter value={total} /></p></div>
           </div>
         </GlassCard>
         <GlassCard className="p-4">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl bg-gold/12 flex items-center justify-center">
-              <Gamepad2 className="w-4.5 h-4.5 text-gold" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">ตัวละครทั้งหมด</p>
-              <p className="text-xl font-bold text-foreground">
-                <AnimatedCounter value={players.reduce((s, p) => s + (parseInt(p.ChaRemain) || 0), 0)} />
-              </p>
-            </div>
+            <div className="size-9 rounded-xl bg-gold/12 flex items-center justify-center"><Gamepad2 className="w-4.5 h-4.5 text-gold" /></div>
+            <div><p className="text-xs text-muted-foreground font-medium">ตัวละครทั้งหมด</p><p className="text-xl font-bold text-foreground">
+              <AnimatedCounter value={players.reduce((s, p) => s + (parseInt(p.ChaRemain) || 0), 0)} /></p></div>
           </div>
         </GlassCard>
-        <button
-          onClick={() => setStatusFilter(statusFilter === 'banned' ? 'all' : 'banned')}
-          className={`text-left transition-all duration-200 ${statusFilter === 'banned' ? 'ring-2 ring-danger/50' : ''}`}
-        >
+        <button onClick={() => setStatusFilter(statusFilter === 'banned' ? 'all' : 'banned')}
+          className={`text-left transition-all duration-200 ${statusFilter === 'banned' ? 'ring-2 ring-danger/50' : ''}`}>
           <GlassCard className={`p-4 h-full ${statusFilter === 'banned' ? 'border-danger/30' : ''}`}>
             <div className="flex items-center gap-3">
-              <div className="size-9 rounded-xl bg-danger/12 flex items-center justify-center">
-                <Ban className="w-4.5 h-4.5 text-danger" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">ถูกบล็อก</p>
-                <p className="text-xl font-bold text-danger">
-                  <AnimatedCounter value={bannedCount} />
-                </p>
-              </div>
+              <div className="size-9 rounded-xl bg-danger/12 flex items-center justify-center"><Ban className="w-4.5 h-4.5 text-danger" /></div>
+              <div><p className="text-xs text-muted-foreground font-medium">ถูกบล็อก</p><p className="text-xl font-bold text-danger"><AnimatedCounter value={bannedCount} /></p></div>
             </div>
           </GlassCard>
         </button>
       </div>
 
-      {/* Search */}
       <GlassCard className="p-4">
-        <form onSubmit={handleSearch} className="flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="text" placeholder="ค้นหา UserID, ชื่อผู้ใช้..." value={searchInput} onChange={e => setSearchInput(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-gold/50 transition-colors" />
-          </div>
-          <Button type="submit" className="bg-gold hover:bg-gold-light text-[#08080e]"><Search className="w-4 h-4" /></Button>
-        </form>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <form onSubmit={handleSearch} className="flex gap-3 flex-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input type="text" placeholder="ค้นหา UserID, ชื่อผู้ใช้..." value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-gold/50 transition-colors" />
+            </div>
+            <Button type="submit" className="bg-gold hover:bg-gold-light text-[#08080e]"><Search className="w-4 h-4" /></Button>
+          </form>
+        </div>
       </GlassCard>
 
-      {/* Filter indicator */}
       {statusFilter !== 'all' && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">กรอง:</span>
@@ -165,15 +123,21 @@ function Players() {
         </div>
       )}
 
-      {/* Account Table */}
       <GlassCard className="overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-foreground">รายชื่อผู้เล่น</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground">แสดง</span>
+            <CustomSelect value={pageSize} onChange={handlePageSizeChange}
+              options={PAGE_OPTIONS.map(v => ({ value: v, label: String(v) }))} className="w-14" />
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="p-6 space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
           ) : filteredPlayers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Users className="w-10 mb-3 opacity-30" />
-              <p className="text-sm font-medium">{statusFilter === 'banned' ? 'ไม่มีผู้เล่นที่ถูกบล็อก' : 'ไม่พบผู้เล่น'}</p>
+              <Users className="w-10 mb-3 opacity-30" /><p className="text-sm font-medium">{statusFilter === 'banned' ? 'ไม่มีผู้เล่นที่ถูกบล็อก' : 'ไม่พบผู้เล่น'}</p>
             </div>
           ) : (
             <table className="w-full">
@@ -195,17 +159,11 @@ function Players() {
                     className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
                     <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{p.UserNum}</td>
                     <td className="px-5 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{p.UserID}</p>
-                        {p.UserFullName && <p className="text-[10px] text-muted-foreground">{p.UserFullName}</p>}
-                      </div>
+                      <div><p className="text-sm font-medium text-foreground">{p.UserID}</p>
+                        {p.UserFullName && <p className="text-[10px] text-muted-foreground">{p.UserFullName}</p>}</div>
                     </td>
-                    <td className="px-5 py-3 text-center">
-                      <span className="text-sm font-semibold text-foreground">{p.ChaRemain ?? '—'}</span>
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <span className="text-sm font-semibold text-gold">{fmt(p.UserPoint)}</span>
-                    </td>
+                    <td className="px-5 py-3 text-center"><span className="text-sm font-semibold text-foreground">{p.ChaRemain ?? '—'}</span></td>
+                    <td className="px-5 py-3 text-right"><span className="text-sm font-semibold text-gold">{fmt(p.UserPoint)}</span></td>
                     <td className="px-5 py-3 text-xs text-muted-foreground">{formatDate(p.LastLoginDate)}</td>
                     <td className="px-5 py-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
@@ -215,20 +173,12 @@ function Players() {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleViewCharacters(p)} title="ดูตัวละคร">
-                          <Eye className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleEditAccount(p)} title="แก้ไขบัญชี">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleViewCharacters(p)} title="ดูตัวละคร"><Eye className="w-3.5 h-3.5" /></Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleEditAccount(p)} title="แก้ไขบัญชี"><Pencil className="w-3.5 h-3.5" /></Button>
                         {p.UserBlock === 1 ? (
-                          <Button variant="ghost" size="icon-sm" onClick={() => handleUnblock(p.UserNum)} title="ปลดบล็อก">
-                            <Unlock className="w-3.5 h-3.5 text-success" />
-                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleUnblock(p.UserNum)} title="ปลดบล็อก"><Unlock className="w-3.5 h-3.5 text-success" /></Button>
                         ) : (
-                          <Button variant="ghost" size="icon-sm" onClick={() => setBanTarget(p)} title="บล็อก">
-                            <Ban className="w-3.5 h-3.5 text-danger" />
-                          </Button>
+                          <Button variant="ghost" size="icon-sm" onClick={() => setBanTarget(p)} title="บล็อก"><Ban className="w-3.5 h-3.5 text-danger" /></Button>
                         )}
                       </div>
                     </td>
@@ -238,57 +188,38 @@ function Players() {
             </table>
           )}
         </div>
-        {total > limit && (
+        {total > pageSize && (
           <div className="flex justify-between p-4 border-t border-white/[0.05]">
-            <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - limit))}>ก่อนหน้า</Button>
-            <span className="text-xs text-muted-foreground self-center">{offset + 1}-{Math.min(offset + limit, total)} / {total}</span>
-            <Button variant="outline" size="sm" disabled={offset + limit >= total} onClick={() => setOffset(o => o + limit)}>ถัดไป</Button>
+            <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - pageSize))}>ก่อนหน้า</Button>
+            <span className="text-xs text-muted-foreground self-center">{offset + 1}-{Math.min(offset + pageSize, total)} / {total}</span>
+            <Button variant="outline" size="sm" disabled={offset + pageSize >= total} onClick={() => setOffset(o => o + pageSize)}>ถัดไป</Button>
           </div>
         )}
       </GlassCard>
 
-      {/* Character Drawer */}
-      <CharacterDrawer
-        account={selectedAccount}
-        open={drawerOpen}
+      <CharacterDrawer account={selectedAccount} open={drawerOpen}
         onClose={() => { setDrawerOpen(false); setSelectedAccount(null); }}
-        onEditChar={(char) => { setCharEditor({ open: true, character: char }); }}
-      />
+        onEditChar={(char) => { setCharEditor({ open: true, character: char }); }} />
 
-      {/* Character Editor */}
-      <CharacterEditor
-        character={charEditor.character}
-        open={charEditor.open}
-        onClose={() => { setCharEditor({ open: false, character: null }); refetchPlayer(); }}
-      />
+      <CharacterEditor character={charEditor.character} open={charEditor.open}
+        onClose={() => { setCharEditor({ open: false, character: null }); }} />
 
-      {/* Account Editor */}
-      <AccountEditor
-        account={accountEditor.account}
-        open={accountEditor.open}
-        onClose={() => { setAccountEditor({ open: false, account: null }); refetch(); }}
-      />
+      <AccountEditor account={accountEditor.account} open={accountEditor.open}
+        onClose={() => { setAccountEditor({ open: false, account: null }); }} />
 
-      {/* Ban Confirmation */}
       <AlertDialog open={!!banTarget} onOpenChange={() => !blockPlayer.isPending && setBanTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Ban className="w-5 h-5 text-danger" />
-              ยืนยันการบล็อก
-            </AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2"><Ban className="w-5 h-5 text-danger" /> ยืนยันการบล็อก</AlertDialogTitle>
             <AlertDialogDescription>
               ต้องการบล็อกผู้เล่น <strong className="text-foreground">{banTarget?.UserID}</strong> (ID: {banTarget?.UserNum}) ใช่หรือไม่?
-              <br /><br />
-              ผู้เล่นจะไม่สามารถเข้าสู่ระบบได้จนกว่าจะปลดบล็อก
+              <br /><br />ผู้เล่นจะไม่สามารถเข้าสู่ระบบได้จนกว่าจะปลดบล็อก
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={blockPlayer.isPending}>ยกเลิก</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBlock} disabled={blockPlayer.isPending}
-              className="bg-danger hover:bg-danger/80 text-white">
-              {blockPlayer.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Ban className="w-4 h-4 mr-1" />}
-              บล็อกผู้เล่น
+            <AlertDialogAction onClick={handleBlock} disabled={blockPlayer.isPending} className="bg-danger hover:bg-danger/80 text-white">
+              {blockPlayer.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Ban className="w-4 h-4 mr-1" />} บล็อกผู้เล่น
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

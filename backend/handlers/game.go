@@ -574,6 +574,114 @@ func (h *GameHandler) PKRecordHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"records": records, "total": total})
 }
 
+// ======================== Player Security Handlers ========================
+
+func (h *GameHandler) GetSecurityInfo(c *gin.Context) {
+	uid := c.Query("uid")
+	if uid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ UserID"})
+		return
+	}
+	info, err := h.svc.GetSecurityInfo(uid)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, info)
+}
+
+func (h *GameHandler) GetLoginLogs(c *gin.Context) {
+	uid := c.Query("uid")
+	if uid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ UserID"})
+		return
+	}
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+	logs, total, err := h.svc.GetLoginLogs(uid, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if logs == nil { logs = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"logs": logs, "total": total})
+}
+
+func (h *GameHandler) GetDeviceChecks(c *gin.Context) {
+	uid := c.Query("uid")
+	if uid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ UserID"})
+		return
+	}
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+	checks, total, err := h.svc.GetDeviceChecks(uid, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if checks == nil { checks = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"checks": checks, "total": total})
+}
+
+func (h *GameHandler) GetBlockHistory(c *gin.Context) {
+	uid := c.Query("uid")
+	if uid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุ UserID"})
+		return
+	}
+	blocks, err := h.svc.GetBlockHistory(uid)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if blocks == nil { blocks = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"blocks": blocks})
+}
+
+func (h *GameHandler) BanIP(c *gin.Context) {
+	var req struct { IP string `json:"ip" binding:"required"`; Reason string `json:"reason"` }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+	if err := h.svc.BanIP(req.IP, req.Reason); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "แบน IP สำเร็จ"})
+}
+
+func (h *GameHandler) BanPC(c *gin.Context) {
+	var req struct { HWID string `json:"hwid" binding:"required"`; Reason string `json:"reason"` }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+	if err := h.svc.BanPC(req.HWID, req.Reason); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "แบน PC สำเร็จ"})
+}
+
+func (h *GameHandler) Unban(c *gin.Context) {
+	var req struct { Value string `json:"value" binding:"required"`; Type string `json:"type" binding:"required"` }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
+		return
+	}
+	if err := h.svc.Unban(req.Value, req.Type); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "ปลดแบนสำเร็จ"})
+}
+
 func (h *GameHandler) ListAllCharacters(c *gin.Context) {
 	search := c.Query("search")
 	classFilter := c.Query("class")

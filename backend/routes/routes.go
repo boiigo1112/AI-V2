@@ -123,6 +123,14 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.GET("/pk-ranking/death", gh.PKDeathRanking)
 				game.GET("/pk-ranking/stats", gh.PKStats)
 				game.GET("/pk-ranking/:id", gh.PKRecordHistory)
+				// Player Security
+				game.GET("/player-security", gh.GetSecurityInfo)
+				game.GET("/player-security/login-logs", gh.GetLoginLogs)
+				game.GET("/player-security/device-checks", gh.GetDeviceChecks)
+				game.GET("/player-security/block-history", gh.GetBlockHistory)
+				game.POST("/player-security/ban-ip", gh.BanIP)
+				game.POST("/player-security/ban-pc", gh.BanPC)
+				game.POST("/player-security/unban", gh.Unban)
 			}
 		}
 	}

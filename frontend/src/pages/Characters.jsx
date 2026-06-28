@@ -13,8 +13,15 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const classMap = { 1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner', 6: 'Defender' };
-const classColors = { 1: '#818cf8', 2: '#3b82f6', 3: '#34d399', 4: '#c9a84c', 5: '#f87171', 6: '#a78bfa' };
+const classMap = {
+  1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner',
+  6: 'Defender', 7: 'Force Blader', 8: 'Force Shuriken', 9: 'Bloody Storm', 10: 'Shadow Walker',
+};
+const classColors = {
+  1: '#818cf8', 2: '#3b82f6', 3: '#34d399', 4: '#c9a84c', 5: '#f87171',
+  6: '#a78bfa', 7: '#f472b6', 8: '#fb923c', 9: '#e11d48', 10: '#6b7280',
+};
+const classKeys = Object.entries(classMap).map(([k, v]) => ({ value: k, label: v }));
 const editableFields = [
   { key: 'ChaLevel', label: 'Level' }, { key: 'ChaMoney', label: 'Money' },
   { key: 'ChaExp', label: 'EXP' }, { key: 'ChaReborn', label: 'Reborn' },
@@ -23,39 +30,36 @@ const editableFields = [
   { key: 'ChaIntel', label: 'Intel' }, { key: 'ChaHP', label: 'HP' },
   { key: 'ChaMP', label: 'MP' }, { key: 'ChaPK', label: 'PK' },
 ];
+const PAGE_OPTIONS = [10, 25, 50, 100, 200];
+const fmt = (v) => v === null || v === undefined ? '—' : typeof v === 'number' ? v.toLocaleString() : String(v);
 
-function StatCard({ icon: Icon, label, value, color, delay }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.4 }}>
-      <GlassCard className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="size-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}12` }}>
-            <Icon className="w-4.5 h-4.5" style={{ color }} />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground font-medium">{label}</p>
-            <p className="text-xl font-bold text-foreground"><AnimatedCounter value={value} /></p>
-          </div>
-        </div>
-      </GlassCard>
-    </motion.div>
-  );
-}
+const summaryClasses = [
+  { key: 'buster', label: 'Buster', color: '#818cf8' },
+  { key: 'tempster', label: 'Tempster', color: '#3b82f6' },
+  { key: 'engineer', label: 'Engineer', color: '#34d399' },
+  { key: 'prowler', label: 'Prowler', color: '#c9a84c' },
+  { key: 'force_gunner', label: 'Force Gunner', color: '#f87171' },
+  { key: 'defender', label: 'Defender', color: '#a78bfa' },
+  { key: 'force_blader', label: 'Force Blader', color: '#f472b6' },
+  { key: 'force_shuriken', label: 'Force Shuriken', color: '#fb923c' },
+  { key: 'bloody_storm', label: 'Bloody Storm', color: '#e11d48' },
+  { key: 'shadow_walker', label: 'Shadow Walker', color: '#6b7280' },
+];
 
 function Characters() {
-  const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [onlineFilter, setOnlineFilter] = useState('');
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
   const [selected, setSelected] = useState(null);
   const [editChar, setEditChar] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [banTarget, setBanTarget] = useState(null);
-  const limit = 50;
 
-  const { data: charsData, isLoading, refetch } = useAllCharacters({ search, class: classFilter, online: onlineFilter, limit, offset });
-  const { data: detail, refetch: refetchDetail } = useCharacterDetail(selected);
+  const { data: charsData, isLoading } = useAllCharacters({ search, class: classFilter, online: onlineFilter, limit: pageSize, offset });
+  const { data: detail, isFetching: detailLoading } = useCharacterDetail(selected);
   const { data: stats } = useCharacterStats();
   const banChar = useBanCharacter();
   const unbanChar = useUnbanCharacter();
@@ -73,7 +77,7 @@ function Characters() {
   };
 
   const handleUnban = async (id) => {
-    try { await unbanChar.mutateAsync(id); toast.success('ปลดระงับสำเร็จ'); refetch(); refetchDetail(); }
+    try { await unbanChar.mutateAsync(id); toast.success('ปลดระงับสำเร็จ'); }
     catch (err) { toast.error(err.response?.data?.error || 'ปลดระงับไม่สำเร็จ'); }
   };
 
@@ -86,27 +90,64 @@ function Characters() {
 
   const handleSaveChar = async () => {
     if (!editChar) return;
+    const toastId = toast.loading('กำลังอัปเดต...');
     try {
       for (const [field, value] of Object.entries(editForm)) {
-        if (value !== '' && value !== undefined && value !== editChar[field]) {
+        if (value !== '' && value !== undefined && String(value) !== String(editChar[field])) {
           await updateChar.mutateAsync({ id: String(editChar.ChaNum), field, value: String(value) });
         }
       }
-      toast.success('อัปเดตสำเร็จ');
+      toast.success('อัปเดตสำเร็จ', { id: toastId });
       setEditChar(null);
-    } catch (err) { toast.error(err.response?.data?.error || 'อัปเดตไม่สำเร็จ'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'อัปเดตไม่สำเร็จ', { id: toastId }); }
   };
 
-  const fmt = (v) => v === null || v === undefined ? '—' : typeof v === 'number' ? v.toLocaleString() : String(v);
+  const handlePageSizeChange = (size) => { setPageSize(size); setOffset(0); };
 
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={Users} label="ตัวละครทั้งหมด" value={stats?.total || 0} color="#818cf8" delay={0.05} />
-        <StatCard icon={Wifi} label="ออนไลน์ตอนนี้" value={stats?.online || 0} color="#34d399" delay={0.1} />
-        <StatCard icon={Swords} label="Buster" value={stats?.buster || 0} color="#818cf8" delay={0.15} />
-        <StatCard icon={Shield} label="Prowler" value={stats?.prowler || 0} color="#c9a84c" delay={0.2} />
+        <GlassCard className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#818cf812' }}><Users className="w-4.5 h-4.5" style={{ color: '#818cf8' }} /></div>
+            <div><p className="text-xs text-muted-foreground font-medium">ตัวละครทั้งหมด</p><p className="text-xl font-bold text-foreground"><AnimatedCounter value={stats?.total || 0} /></p></div>
+          </div>
+        </GlassCard>
+        <GlassCard className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#34d39912' }}><Wifi className="w-4.5 h-4.5" style={{ color: '#34d399' }} /></div>
+            <div><p className="text-xs text-muted-foreground font-medium">ออนไลน์</p><p className="text-xl font-bold text-foreground"><AnimatedCounter value={stats?.online || 0} /></p></div>
+          </div>
+        </GlassCard>
+        {summaryClasses.slice(0, 2).map(c => (
+          <GlassCard key={c.key} className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${c.color}12` }}>
+                <Swords className="w-4.5 h-4.5" style={{ color: c.color }} />
+              </div>
+              <div><p className="text-xs text-muted-foreground font-medium">{c.label}</p><p className="text-xl font-bold text-foreground"><AnimatedCounter value={stats?.[c.key] || 0} /></p></div>
+            </div>
+          </GlassCard>
+        ))}
       </div>
+
+      {/* Class Distribution */}
+      {stats && (
+        <GlassCard className="p-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Class Distribution</h3>
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+            {summaryClasses.map(c => (
+              <div key={c.key} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+                <div className="size-5 rounded flex items-center justify-center" style={{ backgroundColor: `${c.color}20` }}>
+                  <Shield className="w-3 h-3" style={{ color: c.color }} />
+                </div>
+                <span className="text-xs font-bold text-foreground">{stats[c.key] || 0}</span>
+                <span className="text-[9px] text-muted-foreground text-center leading-tight">{c.label}</span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
 
       <GlassCard className="p-4">
         <div className="flex flex-col sm:flex-row gap-3">
@@ -119,24 +160,10 @@ function Characters() {
             <Button type="submit" className="bg-gold hover:bg-gold-light text-[#08080e]"><Search className="w-4 h-4" /></Button>
           </form>
           <div className="flex gap-2">
-            <CustomSelect
-              value={classFilter}
-              onChange={(v) => { setClassFilter(v); setOffset(0); }}
-              placeholder="ทุก Class"
-              options={[{ value: '', label: 'ทุก Class' }, ...Object.entries(classMap).map(([k, v]) => ({ value: k, label: v }))]}
-              className="w-36"
-            />
-            <CustomSelect
-              value={onlineFilter}
-              onChange={(v) => { setOnlineFilter(v); setOffset(0); }}
-              placeholder="ทุกสถานะ"
-              options={[
-                { value: '', label: 'ทุกสถานะ' },
-                { value: '1', label: 'ออนไลน์' },
-                { value: '0', label: 'ออฟไลน์' },
-              ]}
-              className="w-32"
-            />
+            <CustomSelect value={classFilter} onChange={(v) => { setClassFilter(v); setOffset(0); }} placeholder="ทุก Class"
+              options={[{ value: '', label: 'ทุก Class' }, ...classKeys]} className="w-36" />
+            <CustomSelect value={onlineFilter} onChange={(v) => { setOnlineFilter(v); setOffset(0); }} placeholder="ทุกสถานะ"
+              options={[{ value: '', label: 'ทุกสถานะ' }, { value: '1', label: 'ออนไลน์' }, { value: '0', label: 'ออฟไลน์' }]} className="w-32" />
           </div>
         </div>
       </GlassCard>
@@ -144,6 +171,14 @@ function Characters() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="lg:col-span-3">
           <GlassCard className="overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-foreground">รายชื่อตัวละคร</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">แสดง</span>
+                <CustomSelect value={pageSize} onChange={handlePageSizeChange}
+                  options={PAGE_OPTIONS.map(v => ({ value: v, label: String(v) }))} className="w-14" />
+              </div>
+            </div>
             <div className="overflow-x-auto">
               {isLoading ? (
                 <div className="p-6 space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}</div>
@@ -159,7 +194,7 @@ function Characters() {
                       <th scope="col" className="text-center text-[10px] font-semibold text-muted-foreground uppercase px-4 py-3">Level</th>
                       <th scope="col" className="text-center text-[10px] font-semibold text-muted-foreground uppercase px-4 py-3">Class</th>
                       <th scope="col" className="text-right text-[10px] font-semibold text-muted-foreground uppercase px-4 py-3">Power</th>
-                      <th scope="col" className="text-center text-[10px] font-semibold text-muted-foreground uppercase px-4 py-3">Online</th>
+                      <th scope="col" className="text-center text-[10px] font-semibold text-muted-foreground uppercase px-4 py-3">สถานะ</th>
                       <th scope="col" className="text-right text-[10px] font-semibold text-muted-foreground uppercase px-4 py-3">จัดการ</th>
                     </tr>
                   </thead>
@@ -175,7 +210,7 @@ function Characters() {
                             </div>
                             <div>
                               <p className="text-sm font-medium text-foreground">{ch.ChaName}</p>
-                              <p className="text-[10px] text-muted-foreground">ID: {ch.ChaNum}</p>
+                              <p className="text-[10px] text-muted-foreground">#{ch.ChaNum}</p>
                             </div>
                           </div>
                         </td>
@@ -187,7 +222,13 @@ function Characters() {
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-semibold text-gold">{fmt(ch.ChaPower)}</td>
                         <td className="px-4 py-3 text-center">
-                          {ch.ChaOnline === 1 ? <Wifi className="w-3.5 h-3.5 text-success mx-auto" /> : <WifiOff className="w-3.5 h-3.5 text-muted-foreground mx-auto" />}
+                          {ch.ChaDeleted === 1 ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-danger/10 text-danger">ถูกระงับ</span>
+                          ) : ch.ChaOnline === 1 ? (
+                            <Wifi className="w-3.5 h-3.5 text-success mx-auto" />
+                          ) : (
+                            <WifiOff className="w-3.5 h-3.5 text-muted-foreground mx-auto" />
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
@@ -205,11 +246,11 @@ function Characters() {
                 </table>
               )}
             </div>
-            {total > limit && (
+            {total > pageSize && (
               <div className="flex justify-between p-4 border-t border-white/[0.05]">
-                <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - limit))}>ก่อนหน้า</Button>
-                <span className="text-xs text-muted-foreground self-center">{offset + 1}-{Math.min(offset + limit, total)} / {total}</span>
-                <Button variant="outline" size="sm" disabled={offset + limit >= total} onClick={() => setOffset(o => o + limit)}>ถัดไป</Button>
+                <Button variant="outline" size="sm" disabled={offset === 0} onClick={() => setOffset(o => Math.max(0, o - pageSize))}>ก่อนหน้า</Button>
+                <span className="text-xs text-muted-foreground self-center">{offset + 1}-{Math.min(offset + pageSize, total)} / {total}</span>
+                <Button variant="outline" size="sm" disabled={offset + pageSize >= total} onClick={() => setOffset(o => o + pageSize)}>ถัดไป</Button>
               </div>
             )}
           </GlassCard>
@@ -218,6 +259,9 @@ function Characters() {
         <div className="lg:col-span-2">
           {detail ? (
             <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+              {detailLoading && (
+                <div className="absolute top-0 right-0 pt-1 pr-1"><Loader2 className="w-4 h-4 animate-spin text-gold" /></div>
+              )}
               <GlassCard>
                 <div className="p-4">
                   <div className="flex items-center gap-3 mb-3">
@@ -226,8 +270,12 @@ function Characters() {
                     </div>
                     <div>
                       <p className="text-base font-semibold text-foreground">{detail.ChaName}</p>
-                      <p className="text-xs text-muted-foreground">{classMap[detail.ChaClass] || `Class ${detail.ChaClass}`} · {detail.ChaOnline === 1 ? '🟢 ออนไลน์' : '⚫ ออฟไลน์'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {classMap[detail.ChaClass] || `Class ${detail.ChaClass}`}
+                        {detail.ChaDeleted === 1 ? ' · 🔴 ถูกระงับ' : detail.ChaOnline === 1 ? ' · 🟢 ออนไลน์' : ' · ⚫ ออฟไลน์'}
+                      </p>
                     </div>
+                    {detailLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gold ml-auto" />}
                   </div>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={() => openEdit(detail)}><Pencil className="w-3.5 h-3.5 mr-1" /> แก้ไข</Button>
@@ -247,11 +295,11 @@ function Characters() {
                     {[
                       { l: 'Level', v: detail.ChaLevel }, { l: 'Reborn', v: detail.ChaReborn },
                       { l: 'Money', v: detail.ChaMoney, f: true }, { l: 'EXP', v: detail.ChaExp, f: true },
-                      { l: 'Power', v: detail.ChaPower, f: true }, { l: 'PK', v: detail.ChaPK },
+                      { l: 'PK Score', v: detail.ChaPKScore }, { l: 'PK Death', v: detail.ChaPKDeath },
                     ].map(s => (
                       <div key={s.l} className="bg-white/[0.03] rounded-lg p-2 text-center">
                         <p className="text-[10px] text-muted-foreground">{s.l}</p>
-                        <p className="text-sm font-semibold text-foreground">{s.f ? Number(s.v || 0).toLocaleString() : s.v ?? '—'}</p>
+                        <p className="text-sm font-semibold text-foreground">{s.f ? fmt(s.v) : s.v ?? '—'}</p>
                       </div>
                     ))}
                   </div>
@@ -269,7 +317,7 @@ function Characters() {
                     ].map(s => (
                       <div key={s.l} className="bg-white/[0.03] rounded-lg p-2 text-center">
                         <p className="text-[10px] text-muted-foreground">{s.l}</p>
-                        <p className="text-sm font-semibold text-foreground">{Number(s.v || 0).toLocaleString()}</p>
+                        <p className="text-sm font-semibold text-foreground">{fmt(s.v)}</p>
                       </div>
                     ))}
                   </div>

@@ -1164,6 +1164,65 @@ func (s *GameService) Unban(value, banType string) error {
 	return err
 }
 
+// ======================== Ban Manager Services ========================
+
+func (s *GameService) ListIPBans(search string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
+
+	where := ""
+	if search != "" {
+		safe := sanitizeSearch(search)
+		where = fmt.Sprintf("WHERE [BlockAddress] LIKE '%%%%%s%%%%' OR [BlockReason] LIKE '%%%%%s%%%%'", safe, safe)
+	}
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[BlockAddress] " + where).Scan(&total)
+
+	query := fmt.Sprintf("SELECT [BlockIdx],[BlockAddress],[BlockReason],[BlockDate] FROM [RanUser]..[BlockAddress] %s ORDER BY [BlockDate] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", where, offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return []map[string]interface{}{}, total, nil }
+	defer rows.Close()
+
+	return scanRows(rows), total, nil
+}
+
+func (s *GameService) ListPCBans(search string, limit, offset int) ([]map[string]interface{}, int, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, 0, fmt.Errorf("game database not connected") }
+
+	where := ""
+	if search != "" {
+		safe := sanitizeSearch(search)
+		where = fmt.Sprintf("WHERE [BlockHWID] LIKE '%%%%%s%%%%' OR [BlockMAC] LIKE '%%%%%s%%%%' OR [BlockReason] LIKE '%%%%%s%%%%'", safe, safe, safe)
+	}
+
+	var total int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[BlockPCID] " + where).Scan(&total)
+
+	query := fmt.Sprintf("SELECT [BlockIdx],[BlockHWID],[BlockMAC],[BlockTYPE],[BlockReason],[BlockDate] FROM [RanUser]..[BlockPCID] %s ORDER BY [BlockDate] DESC OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", where, offset, limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return []map[string]interface{}{}, total, nil }
+	defer rows.Close()
+
+	return scanRows(rows), total, nil
+}
+
+func (s *GameService) BanManagerStats() (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
+
+	var ipBans, pcBans int
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[BlockAddress]").Scan(&ipBans)
+	gdb.DB.QueryRow("SELECT COUNT(*) FROM [RanUser]..[BlockPCID]").Scan(&pcBans)
+
+	return map[string]interface{}{
+		"ip_bans": ipBans,
+		"pc_bans": pcBans,
+		"total":   ipBans + pcBans,
+	}, nil
+}
+
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
 	if gdb == nil {

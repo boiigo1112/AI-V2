@@ -23,6 +23,7 @@ const routeMap = {
   '/game/status': { title: 'Connection', section: 'Game Data' },
   '/game/player-security': { title: 'Player Security', section: 'Game Data' },
   '/game/coupons': { title: 'Coupons', section: 'Game Data' },
+  '/game/ban-manager': { title: 'Ban Manager', section: 'Game Data' },
 };
 
 function Header() {

@@ -682,6 +682,49 @@ func (h *GameHandler) Unban(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ปลดแบนสำเร็จ"})
 }
 
+// ======================== Ban Manager Handlers ========================
+
+func (h *GameHandler) ListIPBans(c *gin.Context) {
+	search := c.Query("search")
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	bans, total, err := h.svc.ListIPBans(search, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if bans == nil { bans = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"bans": bans, "total": total})
+}
+
+func (h *GameHandler) ListPCBans(c *gin.Context) {
+	search := c.Query("search")
+	limitStr := c.DefaultQuery("limit", "50")
+	offsetStr := c.DefaultQuery("offset", "0")
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	bans, total, err := h.svc.ListPCBans(search, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if bans == nil { bans = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"bans": bans, "total": total})
+}
+
+func (h *GameHandler) BanManagerStats(c *gin.Context) {
+	stats, err := h.svc.BanManagerStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
 func (h *GameHandler) ListAllCharacters(c *gin.Context) {
 	search := c.Query("search")
 	classFilter := c.Query("class")

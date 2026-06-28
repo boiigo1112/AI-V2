@@ -21,6 +21,7 @@ import PlayerSecurity from './pages/PlayerSecurity';
 import Gmc from './pages/Gmc';
 import Coupons from './pages/Coupons';
 import GameStatus from './pages/GameStatus';
+import BanManager from './pages/BanManager';
 
 function AnimatedPage({ children }) {
   return (
@@ -55,6 +56,7 @@ function App() {
             <Route path="/game/shop" element={<AnimatedPage><Shop /></AnimatedPage>} />
             <Route path="/game/logs" element={<AnimatedPage><Logs /></AnimatedPage>} />
             <Route path="/game/status" element={<AnimatedPage><GameStatus /></AnimatedPage>} />
+            <Route path="/game/ban-manager" element={<AnimatedPage><BanManager /></AnimatedPage>} />
           </Route>
           <Route path="*" element={<Navigate to="/install" replace />} />
         </Routes>

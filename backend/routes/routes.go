@@ -133,6 +133,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.POST("/player-security/ban-ip", gh.BanIP)
 				game.POST("/player-security/ban-pc", gh.BanPC)
 				game.POST("/player-security/unban", gh.Unban)
+				// Ban Manager
+				game.GET("/ban-manager/ip-bans", gh.ListIPBans)
+				game.GET("/ban-manager/pc-bans", gh.ListPCBans)
+				game.GET("/ban-manager/stats", gh.BanManagerStats)
+				game.POST("/ban-manager/ban-ip", gh.BanIP)
+				game.POST("/ban-manager/ban-pc", gh.BanPC)
+				game.POST("/ban-manager/unban", gh.Unban)
 			}
 
 			// Coupon routes

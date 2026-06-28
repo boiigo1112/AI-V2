@@ -419,3 +419,55 @@ export function useUnban() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'security'] }); qc.invalidateQueries({ queryKey: ['game', 'players'] }); },
   });
 }
+
+// ======================== Ban Manager ========================
+
+export function useIPBans(params = {}) {
+  const { search = '', limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'ban-manager', 'ip', search, limit, offset],
+    queryFn: () => api.get('/game/ban-manager/ip-bans', { params: { search, limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function usePCBans(params = {}) {
+  const { search = '', limit = 50, offset = 0 } = params;
+  return useQuery({
+    queryKey: ['game', 'ban-manager', 'pc', search, limit, offset],
+    queryFn: () => api.get('/game/ban-manager/pc-bans', { params: { search, limit, offset } }).then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useBanManagerStats() {
+  return useQuery({
+    queryKey: ['game', 'ban-manager', 'stats'],
+    queryFn: () => api.get('/game/ban-manager/stats').then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useBanIPFromManager() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/ban-manager/ban-ip', data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'ban-manager'] }); qc.invalidateQueries({ queryKey: ['game', 'security'] }); },
+  });
+}
+
+export function useBanPCFromManager() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/ban-manager/ban-pc', data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'ban-manager'] }); qc.invalidateQueries({ queryKey: ['game', 'security'] }); },
+  });
+}
+
+export function useUnbanFromManager() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/game/ban-manager/unban', data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['game', 'ban-manager'] }); qc.invalidateQueries({ queryKey: ['game', 'security'] }); },
+  });
+}

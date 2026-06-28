@@ -31,6 +31,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	authSvc := services.NewAuthService(cfg)
 	userSvc := services.NewUserService()
 	gameSvc := services.NewGameService(cfg.JWTSecret)
+	couponSvc := services.NewCouponService()
 
 	ah := handlers.NewAuthHandler(authSvc, cfg)
 	uh := handlers.NewUserHandler(userSvc)
@@ -38,6 +39,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	sh := handlers.NewSettingsHandler()
 	ih := handlers.NewInstallHandler(cfg.JWTSecret)
 	gh := handlers.NewGameHandler(gameSvc)
+	ch := handlers.NewCouponHandler(couponSvc)
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -131,6 +133,18 @@ func Setup(cfg *config.Config) *gin.Engine {
 				game.POST("/player-security/ban-ip", gh.BanIP)
 				game.POST("/player-security/ban-pc", gh.BanPC)
 				game.POST("/player-security/unban", gh.Unban)
+			}
+
+			// Coupon routes
+			coupon := p.Group("/coupons")
+			{
+				coupon.GET("", ch.ListCoupons)
+				coupon.GET("/:id", ch.GetCoupon)
+				coupon.POST("", ch.CreateCoupon)
+				coupon.PUT("/:id", ch.UpdateCoupon)
+				coupon.DELETE("/:id", ch.DeleteCoupon)
+				coupon.GET("/:id/usage", ch.GetCouponUsage)
+				coupon.POST("/redeem", ch.RedeemCoupon)
 			}
 		}
 	}

@@ -19,6 +19,7 @@ import Pets from './pages/Pets';
 import PKRanking from './pages/PKRanking';
 import PlayerSecurity from './pages/PlayerSecurity';
 import Gmc from './pages/Gmc';
+import Coupons from './pages/Coupons';
 import GameStatus from './pages/GameStatus';
 
 function AnimatedPage({ children }) {
@@ -47,6 +48,7 @@ function App() {
             <Route path="/game/characters" element={<AnimatedPage><Characters /></AnimatedPage>} />
             <Route path="/game/pk-ranking" element={<AnimatedPage><PKRanking /></AnimatedPage>} />
             <Route path="/game/player-security" element={<AnimatedPage><PlayerSecurity /></AnimatedPage>} />
+            <Route path="/game/coupons" element={<AnimatedPage><Coupons /></AnimatedPage>} />
             <Route path="/game/pets" element={<AnimatedPage><Pets /></AnimatedPage>} />
             <Route path="/game/guild" element={<AnimatedPage><Guild /></AnimatedPage>} />
             <Route path="/game/gmc" element={<AnimatedPage><Gmc /></AnimatedPage>} />

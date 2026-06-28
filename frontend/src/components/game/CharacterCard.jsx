@@ -1,14 +1,12 @@
 import { motion } from 'framer-motion';
 import { GlassCard } from './GlassCard';
 import { Pencil, MapPin, Clock, Wifi, WifiOff } from 'lucide-react';
-
-const classMap = { 1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner', 6: 'Defender' };
-const schoolMap = { 0: 'Roma', 1: 'Union', 2: 'Cranida' };
+import { getClassName, getSchoolName } from '@/lib/ran-online';
 
 function CharacterCard({ character, onEdit }) {
   const isOnline = character.ChaOnline === 1;
-  const className = classMap[character.ChaClass] || `Class ${character.ChaClass}`;
-  const schoolName = schoolMap[character.ChaSchool] || `School ${character.ChaSchool}`;
+  const className = getClassName(character.ChaClass);
+  const schoolName = getSchoolName(character.ChaSchool);
 
   return (
     <motion.div

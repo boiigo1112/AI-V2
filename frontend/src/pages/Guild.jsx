@@ -7,8 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GlassCard } from '@/components/game/GlassCard';
 import { AnimatedCounter } from '@/components/game/AnimatedCounter';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { getClassName } from '@/lib/ran-online';
 
-const classMap = { 1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner', 6: 'Defender' };
 const posMap = { 1: 'Master', 2: 'Deputy', 3: 'Member', 4: 'Member', 5: 'Member' };
 const fmt = (v) => v === null || v === undefined ? '—' : typeof v === 'number' ? v.toLocaleString() : String(v);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
@@ -167,7 +167,7 @@ function Guild() {
                           <div className="size-7 rounded-lg bg-gold/10 flex items-center justify-center text-xs font-bold text-gold">{m.ChaName?.charAt(0) || '?'}</div>
                           <div className="flex-1">
                             <p className="text-sm font-medium text-foreground">{m.ChaName}</p>
-                            <p className="text-[10px] text-muted-foreground">Lv.{m.ChaLevel} · {classMap[m.ChaClass] || `Class ${m.ChaClass}`}</p>
+                            <p className="text-[10px] text-muted-foreground">Lv.{m.ChaLevel} · {getClassName(m.ChaClass)}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-muted-foreground">{posMap[m.GuPosition] || 'Member'}</span>

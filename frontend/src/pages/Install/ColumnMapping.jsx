@@ -138,11 +138,11 @@ function ColumnMapping({ data, onNext, onBack }) {
       className="max-w-3xl mx-auto"
     >
       <div className="text-center mb-6">
-        <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-4">
-          <GitCompare className="w-8 h-8 text-primary" />
+        <div className="w-16 h-16 rounded-2xl bg-gold/15 flex items-center justify-center mx-auto mb-4">
+          <GitCompare className="w-8 h-8 text-gold" />
         </div>
         <h2 className="text-2xl font-bold mb-2">ปรับแต่งคอลัมน์</h2>
-        <p className="text-muted text-sm">เลือกคอลัมน์ให้ตรงกับฐานข้อมูลเกมของคุณ</p>
+        <p className="text-muted-foreground text-sm">เลือกคอลัมน์ให้ตรงกับฐานข้อมูลเกมของคุณ</p>
         <div className="flex items-center justify-center gap-3 mt-3">
           <Button variant="outline" size="sm" onClick={autoFillAll}>
             <GitCompare className="w-3.5 h-3.5" /> จับคู่อัตโนมัติทั้งหมด
@@ -155,9 +155,9 @@ function ColumnMapping({ data, onNext, onBack }) {
 
       {dbNames.length === 0 ? (
         <Card className="p-8 text-center">
-          <SearchX className="w-12 h-12 text-muted mx-auto mb-3" />
-          <p className="text-muted font-medium">ไม่พบฐานข้อมูล RAN Online</p>
-          <p className="text-xs text-muted/60 mt-1">กรุณาตรวจสอบการเชื่อมต่อ MSSQL ในขั้นตอนก่อนหน้า</p>
+          <SearchX className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground font-medium">ไม่พบฐานข้อมูล RAN Online</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">กรุณาตรวจสอบการเชื่อมต่อ MSSQL ในขั้นตอนก่อนหน้า</p>
           <Button variant="outline" size="sm" onClick={onBack} className="mt-4">
             <ArrowLeft className="w-4 h-4" /> กลับไปเชื่อมต่อใหม่
           </Button>
@@ -171,8 +171,8 @@ function ColumnMapping({ data, onNext, onBack }) {
                 onClick={() => setActiveDB(name)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                   activeDB === name
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                    : 'bg-hover text-muted hover:text-text'
+                    ? 'bg-gold text-white shadow-lg shadow-gold/20'
+                    : 'bg-white/[0.05] text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Database className="w-3.5 h-3.5" />
@@ -189,7 +189,7 @@ function ColumnMapping({ data, onNext, onBack }) {
 
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-sm text-muted">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Database className="w-4 h-4" />
                 {activeDB} — จับคู่ {matchedCount}/{totalCount}
               </div>
@@ -202,7 +202,7 @@ function ColumnMapping({ data, onNext, onBack }) {
 
             <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
               {currentMappings.length === 0 ? (
-                <p className="text-muted text-center py-8">ไม่มีข้อมูลการจับคู่สำหรับฐานข้อมูลนี้</p>
+                <p className="text-muted-foreground text-center py-8">ไม่มีข้อมูลการจับคู่สำหรับฐานข้อมูลนี้</p>
               ) : (
                 currentMappings.map((m, i) => {
                   const filtered = currentOptions.filter((c) => c.tableName === m.table_name);
@@ -210,22 +210,22 @@ function ColumnMapping({ data, onNext, onBack }) {
 
                   return (
                     <div key={i} className={`flex items-center gap-2 p-2.5 rounded-lg transition-colors ${
-                      m.actual_column ? 'bg-success/5 border border-success/20' : 'bg-hover/30'
+                      m.actual_column ? 'bg-success/5 border border-success/20' : 'bg-white/[0.03]'
                     }`}>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">
                           {m.standard_field}
                           {m.is_required && <span className="text-danger ml-1">*</span>}
                         </p>
-                        <p className="text-xs text-muted">{m.table_name}</p>
+                        <p className="text-xs text-muted-foreground">{m.table_name}</p>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted flex-shrink-0" />
+                      <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 
                       {allOpts.length > 0 ? (
                         <select
                           value={m.actual_column || ''}
                           onChange={(e) => updateMapping(i, e.target.value)}
-                          className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary min-w-[180px] max-w-[240px]"
+                          className="bg-background border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary min-w-[180px] max-w-[240px]"
                         >
                           <option value="">— ไม่ได้จับคู่ —</option>
                           {allOpts.map((col, ci) => (
@@ -242,7 +242,7 @@ function ColumnMapping({ data, onNext, onBack }) {
                           value={m.actual_column || ''}
                           onChange={(e) => updateMapping(i, e.target.value)}
                           placeholder="พิมพ์ชื่อคอลัมน์..."
-                          className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-primary min-w-[180px]"
+                          className="bg-background border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary min-w-[180px]"
                         />
                       )}
                     </div>
@@ -251,7 +251,7 @@ function ColumnMapping({ data, onNext, onBack }) {
               )}
             </div>
 
-            <div className="flex justify-between pt-6 mt-4 border-t border-border">
+            <div className="flex justify-between pt-6 mt-4 border-t border-white/[0.06]">
               <Button variant="outline" onClick={onBack}><ArrowLeft className="w-4 h-4" /> ย้อนกลับ</Button>
               <Button onClick={handleSave} disabled={saving}>
                 <Check className="w-4 h-4" /> {saving ? 'กำลังบันทึก...' : 'บันทึก'}

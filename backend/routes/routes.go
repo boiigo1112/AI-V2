@@ -143,6 +143,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 				// Online Map
 				game.GET("/online-map/players", gh.ListOnlinePlayers)
 				game.GET("/online-map/stats", gh.OnlineMapStats)
+				game.GET("/game-stats", gh.GameStats)
+				game.GET("/top-points", gh.ListTopPoints)
+				game.GET("/top-money", gh.ListTopMoney)
 			}
 
 			// Coupon routes

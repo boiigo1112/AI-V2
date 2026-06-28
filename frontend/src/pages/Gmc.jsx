@@ -4,12 +4,12 @@ import { Search, Swords, Coins, Send, Plus, Minus, Ban, MessageSquare, History, 
 import { toast } from 'sonner';
 import { useGmcLookup, useGmcSendItem, useGmcUpdatePoint, useGmcPlayerHistory, useGmcLogs, useGmcNotice, useGamePlayers, useGmcItemTracking, useBlockPlayer, useUnblockPlayer } from '@/hooks/use-game';
 import { Button } from '@/components/ui/button';
+import { getClassName } from '@/lib/ran-online';
 import { GlassCard } from '@/components/game/GlassCard';
 import { CustomSelect } from '@/components/game/CustomSelect';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-const classMap = { 1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner', 6: 'Defender' };
 const historyTypes = [
   { value: 'login', label: '🔑 เข้าสู่ระบบ' }, { value: 'point', label: '💰 ใช้พ้อยท์' },
   { value: 'shop', label: '🛒 ซื้อของ' }, { value: 'logaction', label: '⚔️ Action' },
@@ -256,7 +256,7 @@ function Gmc() {
                             <div className="size-8 rounded-lg bg-gold/10 flex items-center justify-center text-xs font-bold text-gold">{ch.ChaName?.charAt(0) || '?'}</div>
                             <div>
                               <p className="text-sm font-semibold text-foreground">{ch.ChaName}</p>
-                              <p className="text-[10px] text-muted-foreground">Lv.{ch.ChaLevel} · {classMap[ch.ChaClass] || `Class ${ch.ChaClass}`} · {ch.ChaOnline === 1 ? '🟢 ออนไลน์' : '⚫ ออฟไลน์'}</p>
+                              <p className="text-[10px] text-muted-foreground">Lv.{ch.ChaLevel} · {getClassName(ch.ChaClass)} · {ch.ChaOnline === 1 ? '🟢 ออนไลน์' : '⚫ ออฟไลน์'}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">

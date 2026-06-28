@@ -8,20 +8,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { GlassCard } from '@/components/game/GlassCard';
 import { AnimatedCounter } from '@/components/game/AnimatedCounter';
 import { CustomSelect } from '@/components/game/CustomSelect';
+import { classNames, getClassName, getClassColor } from '@/lib/ran-online';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const classMap = {
-  1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner',
-  6: 'Defender', 7: 'Force Blader', 8: 'Force Shuriken', 9: 'Bloody Storm', 10: 'Shadow Walker',
-};
-const classColors = {
-  1: '#818cf8', 2: '#3b82f6', 3: '#34d399', 4: '#c9a84c', 5: '#f87171',
-  6: '#a78bfa', 7: '#f472b6', 8: '#fb923c', 9: '#e11d48', 10: '#6b7280',
-};
-const classKeys = Object.entries(classMap).map(([k, v]) => ({ value: k, label: v }));
+const classKeys = Object.entries(classNames).map(([k, v]) => ({ value: k, label: v }));
 const editableFields = [
   { key: 'ChaLevel', label: 'Level' }, { key: 'ChaMoney', label: 'Money' },
   { key: 'ChaExp', label: 'EXP' }, { key: 'ChaReborn', label: 'Reborn' },
@@ -34,16 +27,16 @@ const PAGE_OPTIONS = [10, 25, 50, 100, 200];
 const fmt = (v) => v === null || v === undefined ? '—' : typeof v === 'number' ? v.toLocaleString() : String(v);
 
 const summaryClasses = [
-  { key: 'buster', label: 'Buster', color: '#818cf8' },
-  { key: 'tempster', label: 'Tempster', color: '#3b82f6' },
-  { key: 'engineer', label: 'Engineer', color: '#34d399' },
-  { key: 'prowler', label: 'Prowler', color: '#c9a84c' },
-  { key: 'force_gunner', label: 'Force Gunner', color: '#f87171' },
-  { key: 'defender', label: 'Defender', color: '#a78bfa' },
-  { key: 'force_blader', label: 'Force Blader', color: '#f472b6' },
-  { key: 'force_shuriken', label: 'Force Shuriken', color: '#fb923c' },
-  { key: 'bloody_storm', label: 'Bloody Storm', color: '#e11d48' },
-  { key: 'shadow_walker', label: 'Shadow Walker', color: '#6b7280' },
+  { key: 'fighter_male', label: 'Fighter Male', color: '#818cf8' },
+  { key: 'knight_male', label: 'Knight Male', color: '#3b82f6' },
+  { key: 'archer_female', label: 'Archer Female', color: '#34d399' },
+  { key: 'spirit_female', label: 'Spirit Female', color: '#c9a84c' },
+  { key: 'extreme_male', label: 'Extreme Male', color: '#f87171' },
+  { key: 'extreme_female', label: 'Extreme Female', color: '#a78bfa' },
+  { key: 'fighter_female', label: 'Fighter Female', color: '#f472b6' },
+  { key: 'knight_female', label: 'Knight Female', color: '#fb923c' },
+  { key: 'archer_male', label: 'Archer Male', color: '#e11d48' },
+  { key: 'spirit_male', label: 'Spirit Male', color: '#6b7280' },
 ];
 
 function Characters() {
@@ -205,7 +198,7 @@ function Characters() {
                         className={`border-b border-white/[0.04] last:border-0 cursor-pointer transition-colors ${selected === ch.ChaNum ? 'bg-gold/5 border-l-2 border-gold' : 'hover:bg-white/[0.02]'}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="size-7 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${classColors[ch.ChaClass] || '#818cf8'}15`, color: classColors[ch.ChaClass] || '#818cf8' }}>
+                            <div className="size-7 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${getClassColor(ch.ChaClass)}15`, color: getClassColor(ch.ChaClass) }}>
                               {ch.ChaName?.charAt(0) || '?'}
                             </div>
                             <div>
@@ -216,8 +209,8 @@ function Characters() {
                         </td>
                         <td className="px-4 py-3 text-center text-sm font-semibold text-foreground">{ch.ChaLevel}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${classColors[ch.ChaClass] || '#818cf8'}15`, color: classColors[ch.ChaClass] || '#818cf8' }}>
-                            {classMap[ch.ChaClass] || `Class ${ch.ChaClass}`}
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${getClassColor(ch.ChaClass)}15`, color: getClassColor(ch.ChaClass) }}>
+                            {getClassName(ch.ChaClass)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-semibold text-gold">{fmt(ch.ChaPower)}</td>
@@ -265,13 +258,13 @@ function Characters() {
               <GlassCard>
                 <div className="p-4">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="size-10 rounded-lg flex items-center justify-center text-sm font-bold" style={{ backgroundColor: `${classColors[detail.ChaClass] || '#818cf8'}20`, color: classColors[detail.ChaClass] || '#818cf8' }}>
+                    <div className="size-10 rounded-lg flex items-center justify-center text-sm font-bold" style={{ backgroundColor: `${getClassColor(detail.ChaClass) || '#818cf8'}20`, color: getClassColor(detail.ChaClass) }}>
                       {detail.ChaName?.charAt(0) || '?'}
                     </div>
                     <div>
                       <p className="text-base font-semibold text-foreground">{detail.ChaName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {classMap[detail.ChaClass] || `Class ${detail.ChaClass}`}
+                        {getClassName(detail.ChaClass)}
                         {detail.ChaDeleted === 1 ? ' · 🔴 ถูกระงับ' : detail.ChaOnline === 1 ? ' · 🟢 ออนไลน์' : ' · ⚫ ออฟไลน์'}
                       </p>
                     </div>

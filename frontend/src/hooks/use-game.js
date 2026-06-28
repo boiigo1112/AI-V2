@@ -491,3 +491,29 @@ export function useOnlineMapStats() {
     refetchInterval: 15_000,
   });
 }
+
+export function useGameStats() {
+  return useQuery({
+    queryKey: ['game', 'game-stats'],
+    queryFn: () => api.get('/game/game-stats').then(r => r.data),
+    staleTime: 30_000,
+  });
+}
+
+export function useTopPoints(limit = 10) {
+  return useQuery({
+    queryKey: ['game', 'top-points', limit],
+    queryFn: () => api.get('/game/top-points', { params: { limit } }).then(r => r.data),
+    enabled: false,
+    staleTime: 30_000,
+  });
+}
+
+export function useTopMoney(limit = 10) {
+  return useQuery({
+    queryKey: ['game', 'top-money', limit],
+    queryFn: () => api.get('/game/top-money', { params: { limit } }).then(r => r.data),
+    enabled: false,
+    staleTime: 30_000,
+  });
+}

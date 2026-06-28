@@ -32,7 +32,7 @@ function InstallWizard() {
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="w-8 h-8 border-2 border-border border-t-primary rounded-full"
+          className="w-8 h-8 border-2 border-white/[0.06] border-t-gold rounded-full"
         />
       </div>
     );
@@ -76,19 +76,19 @@ function InstallWizard() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-[#0a0a1a] via-[#0f0f23] to-[#0a0a2e]">
       {/* Step indicator */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-white/[0.06]">
         <div className="max-w-3xl mx-auto flex items-center justify-between px-6 py-3">
           {steps.slice(0, -1).map((s, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                i <= step ? 'bg-primary text-white' : 'bg-hover text-muted'
-              }`}>
-                {i + 1}
-              </div>
-              <span className={`text-xs hidden sm:inline ${i <= step ? 'text-text' : 'text-muted'}`}>
-                {s}
-              </span>
-              {i < steps.length - 2 && <div className={`w-8 h-0.5 ${i < step ? 'bg-primary' : 'bg-border'}`} />}
+                 i <= step ? 'bg-gold text-[#08080e]' : 'bg-white/[0.05] text-muted-foreground'
+               }`}>
+                 {i + 1}
+               </div>
+               <span className={`text-xs hidden sm:inline ${i <= step ? 'text-foreground' : 'text-muted-foreground'}`}>
+                 {s}
+               </span>
+               {i < steps.length - 2 && <div className={`w-8 h-0.5 ${i < step ? 'bg-gold' : 'bg-white/[0.06]'}`} />}
             </div>
           ))}
         </div>

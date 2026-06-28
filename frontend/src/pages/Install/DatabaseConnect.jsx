@@ -60,11 +60,11 @@ function DatabaseConnect({ onNext, onBack }) {
       className="max-w-lg mx-auto"
     >
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-4">
-          <Database className="w-8 h-8 text-primary" />
+        <div className="w-16 h-16 rounded-2xl bg-gold/15 flex items-center justify-center mx-auto mb-4">
+          <Database className="w-8 h-8 text-gold" />
         </div>
         <h2 className="text-2xl font-bold mb-2">เชื่อมต่อฐานข้อมูลเกม</h2>
-        <p className="text-muted text-sm">กรอกข้อมูลเซิร์ฟเวอร์ MSSQL ของ RAN Online</p>
+        <p className="text-muted-foreground text-sm">กรอกข้อมูลเซิร์ฟเวอร์ MSSQL ของ RAN Online</p>
       </div>
 
       <Card className="p-6">
@@ -79,18 +79,18 @@ function DatabaseConnect({ onNext, onBack }) {
           <Input label="Password" type="password" placeholder="********" {...register('password')} error={errors.password?.message} />
 
           {foundDBs && (
-            <div className="bg-hover/30 rounded-xl p-4 space-y-2">
+            <div className="bg-white/[0.03] rounded-xl p-4 space-y-2">
               <p className="text-sm font-medium">ตรวจพบฐานข้อมูล:</p>
               {['RanUser', 'RanGame1', 'RanLog', 'RanShop'].map((name) => {
                 const found = foundDBs.includes(name);
                 return (
                   <div key={name} className="flex items-center justify-between text-sm">
                     <span>{name}</span>
-                    <span className="text-xs text-muted">{dbLabels[name]}</span>
+                    <span className="text-xs text-muted-foreground">{dbLabels[name]}</span>
                     {found ? (
                       <CheckCircle2 className="w-4 h-4 text-success" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-muted" />
+                      <XCircle className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
                 );

@@ -1,21 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Swords, Wifi, WifiOff, ChevronLeft, ChevronRight, Skull, Loader2 } from 'lucide-react';
+import { Swords, Wifi, WifiOff, Skull, Loader2 } from 'lucide-react';
 import { usePKRanking, usePKDeathRanking, usePKStats, usePKRecordHistory } from '@/hooks/use-game';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GlassCard } from '@/components/game/GlassCard';
 import { AnimatedCounter } from '@/components/game/AnimatedCounter';
 import { CustomSelect } from '@/components/game/CustomSelect';
+import { getClassName, getClassColor } from '@/lib/ran-online';
 
-const classMap = {
-  1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner',
-  6: 'Defender', 7: 'Force Blader', 8: 'Force Shuriken', 9: 'Bloody Storm', 10: 'Shadow Walker',
-};
-const classColors = {
-  1: '#818cf8', 2: '#3b82f6', 3: '#34d399', 4: '#c9a84c', 5: '#f87171',
-  6: '#a78bfa', 7: '#f472b6', 8: '#fb923c', 9: '#e11d48', 10: '#6b7280',
-};
 const fmt = (v) => v === null || v === undefined ? '—' : typeof v === 'number' ? v.toLocaleString() : String(v);
 const PAGE_OPTIONS = [10, 25, 50, 100, 200];
 
@@ -98,7 +91,7 @@ function PKRanking() {
                           <td className="px-3 py-3 text-center text-sm">{rankIcon}</td>
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-2">
-                              <div className="size-7 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${classColors[ch.ChaClass] || '#818cf8'}15`, color: classColors[ch.ChaClass] || '#818cf8' }}>
+                              <div className="size-7 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${getClassColor(ch.ChaClass)}15`, color: getClassColor(ch.ChaClass) }}>
                                 {ch.ChaName?.charAt(0) || '?'}
                               </div>
                               <p className="text-sm font-medium text-foreground">{ch.ChaName}</p>
@@ -106,8 +99,8 @@ function PKRanking() {
                           </td>
                           <td className="px-3 py-3 text-center text-sm font-semibold text-foreground">{ch.ChaLevel}</td>
                           <td className="px-3 py-3 text-center">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${classColors[ch.ChaClass] || '#818cf8'}15`, color: classColors[ch.ChaClass] || '#818cf8' }}>
-                              {classMap[ch.ChaClass] || `C${ch.ChaClass}`}
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${getClassColor(ch.ChaClass)}15`, color: getClassColor(ch.ChaClass) }}>
+                              {getClassName(ch.ChaClass)}
                             </span>
                           </td>
                           <td className="px-3 py-3 text-right text-sm font-semibold text-gold">{fmt(ch.ChaPK)}</td>
@@ -139,12 +132,12 @@ function PKRanking() {
                   {deathData.ranking.map((ch, i) => (
                     <div key={ch.ChaNum || i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] cursor-pointer" onClick={() => setSelectedCha(ch.ChaNum)}>
                       <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}</span>
-                      <div className="size-6 rounded flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: `${classColors[ch.ChaClass] || '#818cf8'}15`, color: classColors[ch.ChaClass] || '#818cf8' }}>
+                      <div className="size-6 rounded flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: `${getClassColor(ch.ChaClass)}15`, color: getClassColor(ch.ChaClass) }}>
                         {ch.ChaName?.charAt(0) || '?'}
                       </div>
                       <div className="flex-1">
                         <p className="text-xs font-medium text-foreground">{ch.ChaName}</p>
-                        <p className="text-[10px] text-muted-foreground">{classMap[ch.ChaClass] || `C${ch.ChaClass}`} · Lv.{ch.ChaLevel} · ตาย {fmt(ch.ChaPKDeath)} · ฆ่า {fmt(ch.ChaPK)}</p>
+                        <p className="text-[10px] text-muted-foreground">{getClassName(ch.ChaClass)} · Lv.{ch.ChaLevel} · ตาย {fmt(ch.ChaPKDeath)} · ฆ่า {fmt(ch.ChaPK)}</p>
                       </div>
                     </div>
                   ))}

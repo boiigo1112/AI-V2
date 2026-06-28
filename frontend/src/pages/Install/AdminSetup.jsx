@@ -46,11 +46,11 @@ function AdminSetup({ onNext, onBack }) {
       className="max-w-lg mx-auto"
     >
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-4">
-          <UserCog className="w-8 h-8 text-primary" />
+        <div className="w-16 h-16 rounded-2xl bg-gold/15 flex items-center justify-center mx-auto mb-4">
+          <UserCog className="w-8 h-8 text-gold" />
         </div>
         <h2 className="text-2xl font-bold mb-2">ตั้งค่าผู้ดูแลระบบ</h2>
-        <p className="text-muted text-sm">สร้างบัญชีผู้ดูแลระบบสำหรับเข้าใช้งาน</p>
+        <p className="text-muted-foreground text-sm">สร้างบัญชีผู้ดูแลระบบสำหรับเข้าใช้งาน</p>
       </div>
 
       <Card className="p-6">

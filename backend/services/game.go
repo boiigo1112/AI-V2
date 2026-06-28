@@ -1260,6 +1260,61 @@ func (s *GameService) OnlineMapStats() (map[string]interface{}, error) {
 	}, nil
 }
 
+func (s *GameService) GameStats() (map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
+
+	var totalPoints int64
+	gdb.DB.QueryRow("SELECT ISNULL(SUM([UserPoint]), 0) FROM [RanUser]..[UserInfo]").Scan(&totalPoints)
+
+	var totalMoney float64
+	gdb.DB.QueryRow("SELECT ISNULL(SUM(CAST([ChaMoney] AS FLOAT)), 0) FROM [RanGame1]..[ChaInfo]").Scan(&totalMoney)
+
+	schoolRows, err := gdb.DB.Query("SELECT [ChaSchool], COUNT(*) AS cnt FROM [RanGame1]..[ChaInfo] GROUP BY [ChaSchool] ORDER BY [ChaSchool]")
+	if err == nil {
+		defer schoolRows.Close()
+	}
+	var schools []map[string]interface{}
+	if err == nil {
+		for schoolRows.Next() {
+			var school, cnt int
+			if err := schoolRows.Scan(&school, &cnt); err != nil { continue }
+			schools = append(schools, map[string]interface{}{"school": school, "count": cnt})
+		}
+	}
+	if schools == nil { schools = []map[string]interface{}{} }
+
+	return map[string]interface{}{
+		"total_points": totalPoints,
+		"total_money":  totalMoney,
+		"schools":      schools,
+	}, nil
+}
+
+func (s *GameService) ListTopPoints(limit int) ([]map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
+
+	query := fmt.Sprintf("SELECT TOP %d [UserNum],[UserID],[UserPoint],[LastLoginDate] FROM [RanUser]..[UserInfo] ORDER BY [UserPoint] DESC", limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return []map[string]interface{}{}, nil }
+	defer rows.Close()
+
+	return scanRows(rows), nil
+}
+
+func (s *GameService) ListTopMoney(limit int) ([]map[string]interface{}, error) {
+	gdb := s.GetDB()
+	if gdb == nil { return nil, fmt.Errorf("game database not connected") }
+
+	query := fmt.Sprintf("SELECT TOP %d c.[ChaNum],c.[ChaName],c.[ChaLevel],c.[ChaClass],c.[ChaMoney],c.[UserNum],u.[UserID] FROM [RanGame1]..[ChaInfo] c LEFT JOIN [RanUser]..[UserInfo] u ON c.[UserNum] = u.[UserNum] ORDER BY c.[ChaMoney] DESC", limit)
+	rows, err := gdb.DB.Query(query)
+	if err != nil { return []map[string]interface{}{}, nil }
+	defer rows.Close()
+
+	return scanRows(rows), nil
+}
+
 func (s *GameService) ListAllCharacters(search, classFilter, levelMin, levelMax, onlineOnly string, limit, offset int) ([]map[string]interface{}, int, error) {
 	gdb := s.GetDB()
 	if gdb == nil {
@@ -1331,9 +1386,11 @@ func (s *GameService) CharacterStats() (map[string]interface{}, error) {
 
 	stats := map[string]interface{}{
 		"total": 0, "online": 0, "offline": 0,
-		"buster": 0, "tempster": 0, "engineer": 0, "prowler": 0,
-		"force_gunner": 0, "defender": 0, "force_blader": 0,
-		"force_shuriken": 0, "bloody_storm": 0, "shadow_walker": 0,
+		"fighter_male": 0, "knight_male": 0, "archer_female": 0, "spirit_female": 0,
+		"extreme_male": 0, "extreme_female": 0, "fighter_female": 0,
+		"knight_female": 0, "archer_male": 0, "spirit_male": 0,
+		"scientist_male": 0, "scientist_female": 0, "assassin_male": 0,
+		"assassin_female": 0, "magician_male": 0, "magician_female": 0,
 	}
 
 	var total int
@@ -1349,7 +1406,12 @@ func (s *GameService) CharacterStats() (map[string]interface{}, error) {
 	if err != nil { return stats, nil }
 	defer rows.Close()
 
-	classKey := map[int]string{1: "buster", 2: "tempster", 3: "engineer", 4: "prowler", 5: "force_gunner", 6: "defender", 7: "force_blader", 8: "force_shuriken", 9: "bloody_storm", 10: "shadow_walker"}
+	classKey := map[int]string{
+		1: "fighter_male", 2: "knight_male", 4: "archer_female", 8: "spirit_female",
+		16: "extreme_male", 32: "extreme_female", 64: "fighter_female", 128: "knight_female",
+		256: "archer_male", 512: "spirit_male", 1024: "scientist_male", 2048: "scientist_female",
+		4096: "assassin_male", 8192: "assassin_female", 16384: "magician_male", 32768: "magician_female",
+	}
 
 	for rows.Next() {
 		var classID, cnt int

@@ -113,7 +113,7 @@ var StandardFields = []StandardField{
 	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaName", Label: "ChaName", Desc: "ชื่อตัวละคร", Required: true},
 	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaLevel", Label: "ChaLevel", Desc: "เลเวล", Required: true},
 	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaClass", Label: "ChaClass", Desc: "คลาส", Required: false},
-	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaSchool", Label: "ChaSchool", Desc: "สายอาชีพ", Required: false},
+	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaSchool", Label: "ChaSchool", Desc: "แคมปัส (0=Sacred Gate, 1=Mystic Peak, 2=Phoenix)", Required: false},
 	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaMoney", Label: "ChaMoney", Desc: "เงิน", Required: false},
 	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaExp", Label: "ChaExp", Desc: "ประสบการณ์", Required: false},
 	{DBName: "RanGame1", Table: "ChaInfo", Field: "ChaOnline", Label: "ChaOnline", Desc: "สถานะออนไลน์", Required: false},

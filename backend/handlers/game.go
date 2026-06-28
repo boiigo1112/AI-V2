@@ -746,6 +746,43 @@ func (h *GameHandler) OnlineMapStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+func (h *GameHandler) GameStats(c *gin.Context) {
+	stats, err := h.svc.GameStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
+func (h *GameHandler) ListTopPoints(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, _ := strconv.Atoi(limitStr)
+	if limit <= 0 || limit > 50 { limit = 10 }
+
+	players, err := h.svc.ListTopPoints(limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if players == nil { players = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"players": players})
+}
+
+func (h *GameHandler) ListTopMoney(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, _ := strconv.Atoi(limitStr)
+	if limit <= 0 || limit > 50 { limit = 10 }
+
+	characters, err := h.svc.ListTopMoney(limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if characters == nil { characters = []map[string]interface{}{} }
+	c.JSON(http.StatusOK, gin.H{"characters": characters})
+}
+
 func (h *GameHandler) ListAllCharacters(c *gin.Context) {
 	search := c.Query("search")
 	classFilter := c.Query("class")

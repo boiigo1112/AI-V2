@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Wifi, WifiOff, Eye, Loader2, Globe } from 'lucide-react';
+import { Wifi, WifiOff, Eye, Globe } from 'lucide-react';
 import { useOnlinePlayers, useOnlineMapStats } from '@/hooks/use-game';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,15 +8,7 @@ import { GlassCard } from '@/components/game/GlassCard';
 import { AnimatedCounter } from '@/components/game/AnimatedCounter';
 import { CharacterDrawer } from '@/components/game/CharacterDrawer';
 import { CharacterEditor } from '@/components/game/CharacterEditor';
-
-const classMap = {
-  1: 'Buster', 2: 'Tempster', 3: 'Engineer', 4: 'Prowler', 5: 'Force Gunner',
-  6: 'Defender', 7: 'Force Blader', 8: 'Force Shuriken', 9: 'Bloody Storm', 10: 'Shadow Walker',
-};
-const classColors = {
-  1: '#818cf8', 2: '#3b82f6', 3: '#34d399', 4: '#c9a84c', 5: '#f87171',
-  6: '#a78bfa', 7: '#f472b6', 8: '#fb923c', 9: '#e11d48', 10: '#6b7280',
-};
+import { getClassName, getClassColor } from '@/lib/ran-online';
 
 const mapColorPalette = ['#818cf8', '#34d399', '#f87171', '#fbbf24', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c'];
 
@@ -134,7 +126,7 @@ function OnlineMap() {
                         className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="size-7 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${classColors[p.ChaClass] || '#818cf8'}15`, color: classColors[p.ChaClass] || '#818cf8' }}>
+                            <div className="size-7 rounded-lg flex items-center justify-center text-xs font-bold" style={{ backgroundColor: `${getClassColor(p.ChaClass)}15`, color: getClassColor(p.ChaClass) }}>
                               {p.ChaName?.charAt(0) || '?'}
                             </div>
                             <div>
@@ -145,8 +137,8 @@ function OnlineMap() {
                         </td>
                         <td className="px-4 py-3 text-center text-sm font-semibold text-foreground">{p.ChaLevel}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${classColors[p.ChaClass] || '#818cf8'}15`, color: classColors[p.ChaClass] || '#818cf8' }}>
-                            {classMap[p.ChaClass] || `C${p.ChaClass}`}
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${getClassColor(p.ChaClass)}15`, color: getClassColor(p.ChaClass) }}>
+                            {getClassName(p.ChaClass)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center text-xs font-mono text-foreground">{p.ChaStartMap ?? '—'}</td>

@@ -72,10 +72,19 @@ func Setup(cfg *config.Config) *gin.Engine {
 	sah := handlers.NewSaasAdminHandler()
 	ph := handlers.NewPaymentHandler(paymentSvc)
 	sh2 := handlers.NewSubscriptionHandler(subscriptionSvc)
+	sech := handlers.NewSecurityHandler(securityAuditSvc)
 
 	// CSRF middleware - applied to API group
 	csrfConfig := middleware.DefaultCSRFConfig()
 	csrfConfig.SecurityAuditService = securityAuditSvc
+	csrfConfig.ExemptPaths = []string{
+		"/api/health",
+		"/api/auth/login",
+		"/api/auth/register",
+		"/api/auth/refresh",
+		"/api/install",
+		"/api/install/status",
+	}
 
 	api := r.Group("/api")
 	api.Use(middleware.RateLimitMiddleware(rateLimiter))
@@ -258,6 +267,15 @@ func Setup(cfg *config.Config) *gin.Engine {
 				saas.GET("/tenants", sah.ListTenants)
 				saas.PUT("/tenants/:id/status", sah.UpdateTenantStatus)
 				saas.POST("/tenants/:id/extend", sah.ExtendTenantExpiry)
+			}
+
+			// Security routes
+			security := p.Group("/security")
+			security.Use(middleware.RequirePermission("saas", "admin"))
+			{
+				security.GET("/stats", sech.GetStats)
+				security.GET("/logs", sech.GetLogs)
+				security.GET("/blocked-ips", sech.GetBlockedIPs)
 			}
 		}
 	}

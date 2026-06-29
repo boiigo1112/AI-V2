@@ -1,0 +1,105 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ===================================================================
+  # Backend Tests (Go + PostgreSQL)
+  # ===================================================================
+  test-backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin123
+          POSTGRES_DB: blacken_admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: backend/go.sum
+
+      - name: Download Go dependencies
+        run: cd backend && go mod download
+
+      - name: Run go vet (static analysis)
+        run: cd backend && go vet ./...
+
+      - name: Build Go binary
+        run: cd backend && go build -o /dev/null .
+
+      - name: Run Go tests
+        run: cd backend && go test ./... -v
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: admin
+          DB_PASSWORD: admin123
+          DB_NAME: blacken_admin
+          JWT_SECRET: test-secret
+          PORT: 8080
+
+  # ===================================================================
+  # Frontend Tests (React + Vite)
+  # ===================================================================
+  test-frontend:
+    name: Frontend (React)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Lint frontend
+        run: cd frontend && npm run lint || true
+
+  # ===================================================================
+  # Docker Build (main branch only)
+  # ===================================================================
+  docker:
+    name: Docker Build
+    if: github.ref == 'refs/heads/main'
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker images
+        run: docker compose build

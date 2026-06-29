@@ -59,13 +59,13 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_security_logs_event ON security_logs(event_type);
-CREATE INDEX idx_security_logs_ip ON security_logs(ip_address);
-CREATE INDEX idx_security_logs_created ON security_logs(created_at DESC);
-CREATE INDEX idx_blocked_ips_ip ON blocked_ips(ip_address);
-CREATE INDEX idx_password_history_user ON password_history(user_id, created_at DESC);
-CREATE INDEX idx_token_blacklist_jti ON token_blacklist(token_jti);
-CREATE INDEX idx_token_blacklist_expires ON token_blacklist(expires_at);
-CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
-CREATE INDEX idx_user_sessions_user ON user_sessions(user_id);
-CREATE INDEX idx_user_sessions_jti ON user_sessions(token_jti);
+CREATE INDEX IF NOT EXISTS idx_security_logs_event ON security_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_security_logs_ip ON security_logs(ip_address);
+CREATE INDEX IF NOT EXISTS idx_security_logs_created ON security_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_blocked_ips_ip ON blocked_ips(ip_address);
+CREATE INDEX IF NOT EXISTS idx_password_history_user ON password_history(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_jti ON token_blacklist(token_jti);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_jti ON user_sessions(token_jti);

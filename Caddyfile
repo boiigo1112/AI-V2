@@ -1,0 +1,92 @@
+# Black En Admin Panel — Caddy Configuration
+# DuckDNS domain: ran-dev.duckdns.org
+
+# HTTP -> HTTPS redirect (global)
+(redirect_https) {
+    @http {
+        protocol http
+    }
+    redir @https https://{host}{uri} permanent
+}
+
+# Main site — production HTTPS
+ran-dev.duckdns.org {
+    # Redirect HTTP to HTTPS
+    import redirect_https
+
+    # Serve static frontend
+    root * /app/frontend/dist
+    encode gzip
+
+    # SPA fallback: serve index.html for all non-file routes
+    try_files {path} /index.html
+
+    # API proxy to Go backend
+    handle_path /api/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    # WebSocket support (if needed)
+    handle_path /ws/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    # Health check endpoint
+    handle /health {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    # Static asset caching
+    header /assets/* Cache-Control "public, max-age=31536000, immutable"
+    header /favicon.svg Cache-Control "public, max-age=86400"
+    header /icons.svg Cache-Control "public, max-age=86400"
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/access.log
+        level INFO
+    }
+}
+
+# HTTP-only fallback (port 8888 — alternative HTTP)
+:8888 {
+    root * /app/frontend/dist
+    encode gzip
+    try_files {path} /index.html
+
+    handle_path /api/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+}
+
+# Admin HTTPS fallback (port 8443 — alternative HTTPS)
+:8443 {
+    tls internal
+
+    root * /app/frontend/dist
+    encode gzip
+    try_files {path} /index.html
+
+    handle_path /api/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+}

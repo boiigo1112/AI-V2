@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/blacken/admin-panel/database"
 	"github.com/blacken/admin-panel/middleware"
 	"github.com/blacken/admin-panel/models"
 	"github.com/blacken/admin-panel/services"
@@ -29,7 +30,7 @@ func (h *PaymentHandler) CreateInvoice(c *gin.Context) {
 	}
 
 	var req struct {
-		TenantID string `json:"tenant_id" binding:"required"`
+		TenantID string `json:"tenant_id"`
 		PlanID   string `json:"plan_id" binding:"required"`
 		Months   int    `json:"months"`
 	}
@@ -43,6 +44,29 @@ func (h *PaymentHandler) CreateInvoice(c *gin.Context) {
 	}
 	if req.Months > 12 {
 		req.Months = 12
+	}
+
+	// Auto-resolve tenant_id if not provided
+	if req.TenantID == "" {
+		// Check if user has a tenant
+		tenantRaw, exists := c.Get("tenant")
+		if exists {
+			if tenant, ok := tenantRaw.(*models.Tenant); ok && tenant != nil {
+				req.TenantID = tenant.ID
+			}
+		}
+		// If still no tenant, try to find from user
+		if req.TenantID == "" {
+			var tid string
+			err := database.DB.QueryRow(`SELECT id FROM tenants WHERE owner_id = $1 LIMIT 1`, userID).Scan(&tid)
+			if err == nil {
+				req.TenantID = tid
+			}
+		}
+		if req.TenantID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required (no tenant found for user)"})
+			return
+		}
 	}
 
 	inv, err := h.svc.CreateInvoice(req.TenantID, userID, req.PlanID, req.Months)

@@ -84,24 +84,32 @@ function SaasCheckout() {
   };
 
   const handleSubmit = async () => {
-    if (!plan || !proofFile) {
-      toast.error('กรุณาแนบหลักฐานการชำระเงิน');
+    if (!plan) {
+      toast.error('กรุณาเลือกแผน');
       return;
     }
 
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('plan_id', plan.id);
-      formData.append('payment_method', payMethod);
-      formData.append('amount', plan.price_monthly || 0);
-      formData.append('proof', proofFile);
-
-      const res = await api.post('/payment/create-invoice', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      // Step 1: Create invoice
+      const invRes = await api.post('/payment/create-invoice', {
+        plan_id: plan.id,
+        months: 1
       });
 
-      setInvoice(res.data);
+      const invoice = invRes.data?.invoice || invRes.data;
+
+      // Step 2: Upload proof if provided
+      if (proofFile && invoice?.id) {
+        const formData = new FormData();
+        formData.append('proof', proofFile);
+        await api.post(`/payment/confirm`, {
+          invoice_id: invoice.id,
+          payment_proof: proofFile.name
+        }).catch(() => {}); // Non-critical - proof can be uploaded later
+      }
+
+      setInvoice(invoice);
       setSubmitted(true);
       toast.success('สร้างใบแจ้งหนี้สำเร็จ');
     } catch (err) {

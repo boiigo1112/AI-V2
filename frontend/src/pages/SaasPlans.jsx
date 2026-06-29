@@ -148,7 +148,7 @@ function SaasPlans() {
     try {
       const [plansRes, subRes] = await Promise.all([
         api.get('/plans'),
-        api.get('/payment/subscription').catch(() => null),
+        api.get('/subscription/current').catch(() => null),
       ]);
       setPlans(plansRes.data?.plans || plansRes.data || []);
       if (subRes?.data) {

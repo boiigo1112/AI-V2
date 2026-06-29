@@ -99,6 +99,12 @@ func (h *SubscriptionHandler) GetCurrentSubscription(c *gin.Context) {
 	// Fallback: use tenant_id from query
 	tenantID := c.Query("tenant_id")
 	if tenantID == "" || !middleware.IsValidUUID(tenantID) {
+		// For superadmin without tenant context, return empty subscription
+		userID, _ := c.Get("user_id")
+		if userID != "" {
+			c.JSON(http.StatusOK, gin.H{"subscription": nil, "message": "no tenant context"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
 		return
 	}

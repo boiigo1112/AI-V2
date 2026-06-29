@@ -96,6 +96,9 @@ func (s *TenantService) CreateTenant(name, subdomain, planID, ownerID string) (*
 	}
 
 	var t models.Tenant
+	var expireAt sql.NullTime
+	var gameDBHost, gameDBPort, gameDBUser, gameDBPassword, gameDBNames sql.NullString
+
 	err := database.DB.QueryRow(`
 		INSERT INTO tenants (name, subdomain, owner_id)
 		VALUES ($1, $2, $3)
@@ -104,8 +107,8 @@ func (s *TenantService) CreateTenant(name, subdomain, planID, ownerID string) (*
 		          created_at, expire_at, updated_at
 	`, name, subdomain, ownerID).Scan(
 		&t.ID, &t.Name, &t.Subdomain, &t.Plan, &t.Status, &t.OwnerID,
-		&t.GameDBHost, &t.GameDBPort, &t.GameDBUser, &t.GameDBPassword, &t.GameDBNames,
-		&t.CreatedAt, &t.ExpireAt, &t.UpdatedAt,
+		&gameDBHost, &gameDBPort, &gameDBUser, &gameDBPassword, &gameDBNames,
+		&t.CreatedAt, &expireAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
@@ -113,6 +116,13 @@ func (s *TenantService) CreateTenant(name, subdomain, planID, ownerID string) (*
 		}
 		return nil, err
 	}
+
+	if gameDBHost.Valid { t.GameDBHost = gameDBHost.String }
+	if gameDBPort.Valid { t.GameDBPort = gameDBPort.String }
+	if gameDBUser.Valid { t.GameDBUser = gameDBUser.String }
+	if gameDBPassword.Valid { t.GameDBPassword = gameDBPassword.String }
+	if gameDBNames.Valid { t.GameDBNames = gameDBNames.String }
+	if expireAt.Valid { t.ExpireAt = &expireAt.Time }
 
 	// Create subscription if planID is provided
 	if planID != "" {

@@ -484,7 +484,7 @@ function SaasBilling() {
   const fetchData = useCallback(async () => {
     try {
       const [subRes, invRes, configRes] = await Promise.all([
-        api.get('/payment/subscription').catch(() => null),
+        api.get('/subscription/current').catch(() => null),
         api.get('/payment/invoices').catch(() => null),
         api.get('/payment/configs').catch(() => null),
       ]);

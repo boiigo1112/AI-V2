@@ -31,6 +31,7 @@ import SaasDashboard from './pages/SaasDashboard';
 import SaasPlans from './pages/SaasPlans';
 import SaasCheckout from './pages/SaasCheckout';
 import SaasBilling from './pages/SaasBilling';
+import SecurityDashboard from './pages/SecurityDashboard';
 
 function AnimatedPage({ children }) {
   return (
@@ -81,6 +82,7 @@ function App() {
             <Route path="/saas/plans" element={<AnimatedPage><SaasPlans /></AnimatedPage>} />
             <Route path="/saas/checkout/:planId" element={<AnimatedPage><SaasCheckout /></AnimatedPage>} />
             <Route path="/saas/billing" element={<AnimatedPage><SaasBilling /></AnimatedPage>} />
+            <Route path="/saas/security" element={<AnimatedPage><SecurityDashboard /></AnimatedPage>} />
             <Route path="/saas/settings" element={<AnimatedPage><SaasDashboard /></AnimatedPage>} />
           </Route>
 

@@ -15,8 +15,8 @@ import (
 )
 
 type AuthHandler struct {
-	svc *services.AuthService
-	cfg *config.Config
+	svc  *services.AuthService
+	cfg  *config.Config
 }
 
 func NewAuthHandler(svc *services.AuthService, cfg *config.Config) *AuthHandler {
@@ -30,10 +30,21 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.svc.Login(req)
+	// Get device fingerprint from header if not in body
+	deviceFingerprint := req.DeviceFingerprint
+	if deviceFingerprint == "" {
+		deviceFingerprint = c.GetHeader("X-Device-Fingerprint")
+	}
+
+	resp, err := h.svc.Login(req, deviceFingerprint)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Set CSRF cookie with the refresh token on login
+	if resp.RefreshToken != "" {
+		c.SetCookie("csrf_token", resp.RefreshToken, 3600, "/", "", false, true)
 	}
 
 	c.JSON(http.StatusOK, resp)
@@ -62,6 +73,93 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, resp)
 }
 
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	var req models.RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	deviceFingerprint := req.DeviceFingerprint
+	if deviceFingerprint == "" {
+		deviceFingerprint = c.GetHeader("X-Device-Fingerprint")
+	}
+
+	resp, err := h.svc.RefreshAccessToken(req.RefreshToken, deviceFingerprint)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	// Get the token from Authorization header
+	header := c.GetHeader("Authorization")
+	if header == "" {
+		c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+		return
+	}
+
+	tokenStr := ""
+	if len(header) > 7 && header[:7] == "Bearer " {
+		tokenStr = header[7:]
+	}
+
+	if tokenStr == "" {
+		c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+		return
+	}
+
+	if err := h.svc.Logout(tokenStr); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "logout failed"})
+		return
+	}
+
+	// Clear CSRF cookie
+	c.SetCookie("csrf_token", "", -1, "/", "", false, true)
+
+	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
+}
+
+func (h *AuthHandler) Sessions(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	sessions, err := h.svc.GetActiveSessions(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get sessions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"sessions": sessions})
+}
+
+func (h *AuthHandler) RevokeSession(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "session ID is required"})
+		return
+	}
+
+	if err := h.svc.RevokeSession(sessionID, userID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "session revoked"})
+}
+
 func (h *AuthHandler) Me(c *gin.Context) {
 	userID, err := getUserID(c)
 	if err != nil {
@@ -76,6 +174,27 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	var req models.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if err := h.svc.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
 }
 
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
@@ -101,9 +220,9 @@ type googleTokenResponse struct {
 }
 
 type googleUserInfo struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	ID      string `json:"id"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
 	Picture string `json:"picture"`
 }
 

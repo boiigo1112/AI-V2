@@ -98,6 +98,11 @@ func GetUserByID(id string) (models.User, error) {
 	return scanUser(DB.QueryRow(query, id).Scan)
 }
 
+func GetUserByIDWithPassword(id string) (models.User, error) {
+	query := userJoinRoleQueryWithPassword + " WHERE u.id = $1"
+	return scanUserWithPassword(DB.QueryRow(query, id).Scan)
+}
+
 func GetUserByEmail(email string) (models.User, error) {
 	query := userJoinRoleQuery + " WHERE u.email = $1"
 	return scanUser(DB.QueryRow(query, email).Scan)

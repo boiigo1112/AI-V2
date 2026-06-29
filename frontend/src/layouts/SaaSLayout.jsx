@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Building2, CreditCard, Settings, LogOut, Zap, Users, Receipt } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, Settings, LogOut, Zap, Users, Receipt, Shield } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { cn } from '../lib/utils';
 
@@ -9,6 +9,7 @@ const saasMenuItems = [
   { path: '/saas/tenants', label: 'Tenants', icon: Building2 },
   { path: '/saas/plans', label: 'Plans', icon: CreditCard },
   { path: '/saas/billing', label: 'Billing', icon: Receipt },
+  { path: '/saas/security', label: 'Security', icon: Shield },
   { path: '/saas/settings', label: 'Settings', icon: Settings },
 ];
 

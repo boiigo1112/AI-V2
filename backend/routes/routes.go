@@ -17,18 +17,38 @@ func Setup(cfg *config.Config) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
+	// Initialize security audit service
+	securityAuditSvc := services.NewSecurityAuditService()
+
+	// WAF middleware - add early in chain
+	wafConfig := middleware.DefaultWAFConfig()
+	wafConfig.SecurityAuditService = securityAuditSvc
+	r.Use(middleware.WAF(wafConfig))
+	r.Use(middleware.ValidateJSONStructure())
+
+	// Security headers
 	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.MaxBodySize(1 << 20)) // 1MB max
 
+	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-CSRF-Token", "X-Device-Fingerprint"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Rate limiter middleware
+	rateLimitCfg := middleware.DefaultRateLimitConfig()
+	rateLimitCfg.SecurityAuditService = securityAuditSvc
+	rateLimiter := middleware.NewRateLimiter(rateLimitCfg)
+	rateLimiter.SetAuditService(securityAuditSvc)
+
+	// Initialize services
 	authSvc := services.NewAuthService(cfg)
+	authSvc.SetSecurityAuditService(securityAuditSvc)
+
 	userSvc := services.NewUserService()
 	gameSvc := services.NewGameService(cfg.JWTSecret)
 	couponSvc := services.NewCouponService()
@@ -38,6 +58,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 	auditSvc := services.NewAuditService()
 	paymentSvc := services.NewPaymentService(tenantSvc)
 	subscriptionSvc := services.NewSubscriptionService()
+
+	// Initialize handlers
 	ah := handlers.NewAuthHandler(authSvc, cfg)
 	uh := handlers.NewUserHandler(userSvc)
 	dh := handlers.NewDashboardHandler()
@@ -51,9 +73,13 @@ func Setup(cfg *config.Config) *gin.Engine {
 	ph := handlers.NewPaymentHandler(paymentSvc)
 	sh2 := handlers.NewSubscriptionHandler(subscriptionSvc)
 
-	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
+	// CSRF middleware - applied to API group
+	csrfConfig := middleware.DefaultCSRFConfig()
+	csrfConfig.SecurityAuditService = securityAuditSvc
 
 	api := r.Group("/api")
+	api.Use(middleware.RateLimitMiddleware(rateLimiter))
+	api.Use(middleware.CSRF(csrfConfig))
 	{
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
@@ -69,8 +95,11 @@ func Setup(cfg *config.Config) *gin.Engine {
 			install.POST("/reset", ih.ResetInstall)
 		}
 
-		api.POST("/auth/login", middleware.RateLimit(loginLimiter), ah.Login)
+		// Auth routes - some with specific rate limiting
+		api.POST("/auth/login", ah.Login)
 		api.POST("/auth/register", ah.Register)
+		api.POST("/auth/refresh", ah.RefreshToken)
+		api.POST("/auth/logout", ah.Logout)
 		api.GET("/auth/google", ah.GoogleLogin)
 		api.GET("/auth/google/callback", ah.GoogleCallback)
 		api.GET("/auth/github", ah.GithubLogin)
@@ -80,6 +109,9 @@ func Setup(cfg *config.Config) *gin.Engine {
 		p.Use(middleware.AuthRequired(cfg))
 		{
 			p.GET("/me", ah.Me)
+			p.GET("/auth/sessions", ah.Sessions)
+			p.POST("/auth/sessions/:id/revoke", ah.RevokeSession)
+
 			p.GET("/dashboard/stats", dh.Stats)
 
 			p.GET("/users", middleware.RequirePermission("users", "read"), uh.List)
@@ -90,7 +122,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 			p.GET("/roles", middleware.RequirePermission("roles", "read"), uh.ListRoles)
 			p.PUT("/settings/profile", sh.UpdateProfile)
-			p.PUT("/settings/password", sh.ChangePassword)
+			p.PUT("/settings/password", ah.ChangePassword)
 
 			game := p.Group("/game")
 			{

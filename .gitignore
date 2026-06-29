@@ -42,3 +42,9 @@ backend/blacken-server
 cloudflared*
 ngrok*
 .env
+*.tgz
+*.tar.gz
+cloudflared*
+ngrok*
+.env
+production-*.sh

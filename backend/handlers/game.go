@@ -1,20 +1,50 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/blacken/admin-panel/services"
 )
 
 type GameHandler struct {
-	svc *services.GameService
+	svc       *services.GameService
+	backup    *services.BackupService
+	validator *services.Validator
+	audit     *services.AuditService
 }
 
-func NewGameHandler(svc *services.GameService) *GameHandler {
-	return &GameHandler{svc: svc}
+func NewGameHandler(svc *services.GameService, backup *services.BackupService, validator *services.Validator, audit *services.AuditService) *GameHandler {
+	return &GameHandler{
+		svc:       svc,
+		backup:    backup,
+		validator: validator,
+		audit:     audit,
+	}
+}
+
+// getGameDB returns the MSSQL *sql.DB from the game service, or sends error and returns nil.
+func (h *GameHandler) getGameDB(c *gin.Context) *sql.DB {
+	gameDB := h.svc.GetDB()
+	if gameDB == nil || gameDB.DB == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "game database not connected"})
+		return nil
+	}
+	return gameDB.DB
+}
+
+// auditLog logs an action to the audit system with user context from the request.
+func (h *GameHandler) auditLog(c *gin.Context, action, table, targetID string, before, after interface{}) {
+	userID, _ := getUserID(c)
+	ip := c.ClientIP()
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+	h.audit.LogAction(ctx, userID, action, table, targetID, before, after, ip)
 }
 
 func (h *GameHandler) Status(c *gin.Context) {
@@ -152,10 +182,29 @@ func (h *GameHandler) BlockPlayer(c *gin.Context) {
 	}
 	c.ShouldBindJSON(&req)
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Backup before write
+	h.backup.BackupTable(db, "UserInfo", "WHERE [UserNum] = "+usernum)
+
+	// 2. Validate player exists
+	if err := h.validator.ValidatePlayerID(db, usernum); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 3. Execute write
 	if err := h.svc.BlockPlayer(tableName, usernum, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "block_player", "UserInfo", usernum, nil, gin.H{"UserBlock": 1, "reason": req.Reason})
+
 	c.JSON(http.StatusOK, gin.H{"message": "ผู้เล่นถูกบล็อกแล้ว"})
 }
 
@@ -163,10 +212,29 @@ func (h *GameHandler) UnblockPlayer(c *gin.Context) {
 	usernum := c.Param("id")
 	tableName := c.DefaultQuery("table", "UserInfo")
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Backup before write
+	h.backup.BackupTable(db, "UserInfo", "WHERE [UserNum] = "+usernum)
+
+	// 2. Validate player exists
+	if err := h.validator.ValidatePlayerID(db, usernum); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 3. Execute write
 	if err := h.svc.UnblockPlayer(tableName, usernum); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "unblock_player", "UserInfo", usernum, nil, gin.H{"UserBlock": 0})
+
 	c.JSON(http.StatusOK, gin.H{"message": "ปลดบล็อกผู้เล่นแล้ว"})
 }
 
@@ -182,10 +250,44 @@ func (h *GameHandler) UpdateCharacter(c *gin.Context) {
 		return
 	}
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Backup before write
+	h.backup.BackupTable(db, "ChaInfo", "WHERE [ChaNum] = "+chanum)
+
+	// 2. Validate character exists
+	if err := h.validator.ValidateCharacterID(db, chanum); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 3. Validate field value
+	allowedFields := map[string]struct{ min, max int }{
+		"ChaLevel": {1, 999}, "ChaReborn": {0, 999}, "ChaMoney": {0, 999999999},
+		"ChaExp": {0, 999999999}, "ChaPower": {0, 99999}, "ChaDex": {0, 99999},
+		"ChaSpirit": {0, 99999}, "ChaStrong": {0, 99999}, "ChaIntel": {0, 99999},
+		"ChaHP": {0, 9999999}, "ChaMP": {0, 9999999}, "ChaPK": {0, 99999},
+	}
+	if limits, ok := allowedFields[req.Field]; ok {
+		val, _ := strconv.Atoi(req.Value)
+		if err := h.validator.ValidateNumericRange(req.Field, val, limits.min, limits.max); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	// 4. Execute write
 	if err := h.svc.UpdateCharacter(chanum, req.Field, req.Value); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 5. Audit after write
+	h.auditLog(c, "update_character", "ChaInfo", chanum, nil, gin.H{req.Field: req.Value})
+
 	c.JSON(http.StatusOK, gin.H{"message": "อัปเดตตัวละครสำเร็จ"})
 }
 
@@ -200,10 +302,35 @@ func (h *GameHandler) UpdatePlayer(c *gin.Context) {
 		return
 	}
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Backup before write
+	h.backup.BackupTable(db, "UserInfo", "WHERE [UserNum] = "+usernum)
+
+	// 2. Validate player exists
+	if err := h.validator.ValidatePlayerID(db, usernum); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 3. Validate fields
+	if err := h.validator.ValidateUserInfoFields(req.Fields); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 4. Execute write
 	if err := h.svc.UpdatePlayer(usernum, req.Fields); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 5. Audit after write
+	h.auditLog(c, "update_player", "UserInfo", usernum, nil, req.Fields)
+
 	c.JSON(http.StatusOK, gin.H{"message": "อัปเดตข้อมูลผู้เล่นสำเร็จ"})
 }
 
@@ -247,10 +374,37 @@ func (h *GameHandler) CreateShopItem(c *gin.Context) {
 		return
 	}
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate inputs
+	if err := h.validator.ValidateStringLength("ItemName", req.ItemName, 100); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.validator.ValidateNumericRange("ItemPrice", req.ItemPrice, 0, 999999999); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.validator.ValidateNumericRange("ItemStock", req.ItemStock, 0, 999999999); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup table before insert
+	h.backup.BackupTable(db, "ShopItemMap", "")
+
+	// 3. Execute write
 	if err := h.svc.CreateShopItem(req.ItemName, req.ItemPrice, req.ItemStock, req.ItemMain, req.ItemSub, req.Category, req.ItemSection); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "create_shop_item", "ShopItemMap", "", nil, req)
+
 	c.JSON(http.StatusOK, gin.H{"message": "สร้างสินค้าสำเร็จ"})
 }
 
@@ -274,6 +428,20 @@ func (h *GameHandler) UpdateShopItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
 		return
 	}
+
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate item exists
+	if err := h.validator.ValidateItemID(db, id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup before update
+	h.backup.BackupTable(db, "ShopItemMap", "WHERE [ProductNum] = "+id)
 
 	fields := make(map[string]interface{})
 	if req.ItemName != nil {
@@ -310,20 +478,50 @@ func (h *GameHandler) UpdateShopItem(c *gin.Context) {
 		fields["Category"] = *req.Category
 	}
 
+	// 3. Validate fields
+	if err := h.validator.ValidateShopItemFields(fields); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 4. Execute write
 	if err := h.svc.UpdateShopItem(id, fields); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 5. Audit after write
+	h.auditLog(c, "update_shop_item", "ShopItemMap", id, nil, fields)
+
 	c.JSON(http.StatusOK, gin.H{"message": "อัปเดตสินค้าสำเร็จ"})
 }
 
 func (h *GameHandler) DeleteShopItem(c *gin.Context) {
 	id := c.Param("id")
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate item exists
+	if err := h.validator.ValidateItemID(db, id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup before delete
+	h.backup.BackupTable(db, "ShopItemMap", "WHERE [ProductNum] = "+id)
+
+	// 3. Execute write
 	if err := h.svc.DeleteShopItem(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "delete_shop_item", "ShopItemMap", id, nil, nil)
+
 	c.JSON(http.StatusOK, gin.H{"message": "ลบสินค้าสำเร็จ"})
 }
 
@@ -644,41 +842,96 @@ func (h *GameHandler) GetBlockHistory(c *gin.Context) {
 }
 
 func (h *GameHandler) BanIP(c *gin.Context) {
-	var req struct { IP string `json:"ip" binding:"required"`; Reason string `json:"reason"` }
+	var req struct {
+		IP     string `json:"ip" binding:"required"`
+		Reason string `json:"reason"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
 		return
 	}
+
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Backup BlockAddress table
+	h.backup.BackupTable(db, "BlockAddress", "")
+
+	// 2. Execute write
 	if err := h.svc.BanIP(req.IP, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 3. Audit after write
+	h.auditLog(c, "ban_ip", "BlockAddress", req.IP, nil, gin.H{"ip": req.IP, "reason": req.Reason})
+
 	c.JSON(http.StatusOK, gin.H{"message": "แบน IP สำเร็จ"})
 }
 
 func (h *GameHandler) BanPC(c *gin.Context) {
-	var req struct { HWID string `json:"hwid" binding:"required"`; Reason string `json:"reason"` }
+	var req struct {
+		HWID   string `json:"hwid" binding:"required"`
+		Reason string `json:"reason"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
 		return
 	}
+
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Backup BlockPCID table
+	h.backup.BackupTable(db, "BlockPCID", "")
+
+	// 2. Execute write
 	if err := h.svc.BanPC(req.HWID, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 3. Audit after write
+	h.auditLog(c, "ban_pc", "BlockPCID", req.HWID, nil, gin.H{"hwid": req.HWID, "reason": req.Reason})
+
 	c.JSON(http.StatusOK, gin.H{"message": "แบน PC สำเร็จ"})
 }
 
 func (h *GameHandler) Unban(c *gin.Context) {
-	var req struct { Value string `json:"value" binding:"required"`; Type string `json:"type" binding:"required"` }
+	var req struct {
+		Value string `json:"value" binding:"required"`
+		Type  string `json:"type" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง"})
 		return
 	}
+
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// Determine table to backup
+	backupTable := "BlockPCID"
+	if req.Type == "ip" {
+		backupTable = "BlockAddress"
+	}
+	h.backup.BackupTable(db, backupTable, "")
+
+	// Execute write
 	if err := h.svc.Unban(req.Value, req.Type); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Audit after write
+	h.auditLog(c, "unban", backupTable, req.Value, nil, gin.H{"value": req.Value, "type": req.Type})
+
 	c.JSON(http.StatusOK, gin.H{"message": "ปลดแบนสำเร็จ"})
 }
 
@@ -840,20 +1093,58 @@ func (h *GameHandler) BanCharacter(c *gin.Context) {
 	}
 	c.ShouldBindJSON(&req)
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate character exists
+	if err := h.validator.ValidateCharacterID(db, chanum); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup before write
+	h.backup.BackupTable(db, "ChaInfo", "WHERE [ChaNum] = "+chanum)
+
+	// 3. Execute write
 	if err := h.svc.BanCharacter(chanum, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "ban_character", "ChaInfo", chanum, nil, gin.H{"ChaDeleted": 1, "reason": req.Reason})
+
 	c.JSON(http.StatusOK, gin.H{"message": "ระงับตัวละครสำเร็จ"})
 }
 
 func (h *GameHandler) UnbanCharacter(c *gin.Context) {
 	chanum := c.Param("id")
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate character exists
+	if err := h.validator.ValidateCharacterID(db, chanum); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup before write
+	h.backup.BackupTable(db, "ChaInfo", "WHERE [ChaNum] = "+chanum)
+
+	// 3. Execute write
 	if err := h.svc.UnbanCharacter(chanum); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "unban_character", "ChaInfo", chanum, nil, gin.H{"ChaDeleted": 0})
+
 	c.JSON(http.StatusOK, gin.H{"message": "ปลดระงับตัวละครสำเร็จ"})
 }
 
@@ -886,11 +1177,39 @@ func (h *GameHandler) GmcSendItem(c *gin.Context) {
 		return
 	}
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate
+	if err := h.validator.ValidateGmcTargetType(req.TargetType); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.validator.ValidateNumericRange("ProductNum", req.ProductNum, 1, 999999999); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.validator.ValidateNumericRange("Quantity", req.Quantity, 1, 999999999); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup shop tables before write
+	h.backup.BackupTable(db, "ShopPurchase", "")
+	h.backup.BackupTable(db, "ItemGiftHistory", "")
+
+	// 3. Execute write
 	result, err := h.svc.GmcSendItem(req.TargetType, req.TargetID, req.ProductNum, req.Quantity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "gmc_send_item", "ShopPurchase/ItemGiftHistory", req.TargetID, nil, req)
+
 	c.JSON(http.StatusOK, gin.H{"message": "ส่งไอเทมสำเร็จ", "results": result})
 }
 
@@ -907,11 +1226,38 @@ func (h *GameHandler) GmcUpdatePoint(c *gin.Context) {
 		return
 	}
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate
+	if err := h.validator.ValidateGmcTargetType(req.TargetType); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.validator.ValidateGmcPointType(req.PointType); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.validator.ValidateNumericRange("Amount", req.Amount, 0, 999999999); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup UserInfo table before write
+	h.backup.BackupTable(db, "UserInfo", "")
+
+	// 3. Execute write
 	result, err := h.svc.GmcUpdatePoint(req.TargetType, req.TargetID, req.PointType, req.Amount, req.Mode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "gmc_update_point", "UserInfo", req.TargetID, nil, req)
+
 	c.JSON(http.StatusOK, gin.H{"message": "ดำเนินการสำเร็จ", "results": result})
 }
 
@@ -951,10 +1297,33 @@ func (h *GameHandler) GmcNotice(c *gin.Context) {
 		return
 	}
 
+	db := h.getGameDB(c)
+	if db == nil {
+		return
+	}
+
+	// 1. Validate string lengths
+	if err := h.validator.ValidateStringLength("Subject", req.Subject, 100); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.validator.ValidateStringLength("Content", req.Content, 500); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. Backup GameNotice table
+	h.backup.BackupTable(db, "GameNotice", "")
+
+	// 3. Execute write
 	if err := h.svc.GmcNotice(req.Subject, req.Content); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 4. Audit after write
+	h.auditLog(c, "gmc_notice", "GameNotice", "", nil, req)
+
 	c.JSON(http.StatusOK, gin.H{"message": "ประกาศสำเร็จ"})
 }
 

@@ -5,7 +5,9 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import MainLayout from './layouts/MainLayout';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Install from './pages/Install';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
@@ -40,9 +42,10 @@ function App() {
     <AuthProvider>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
+          <Route path="/" element={<Landing />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/install" element={<ErrorBoundary message="เกิดข้อผิดพลาดในขั้นตอนการติดตั้ง"><Install /></ErrorBoundary>} />
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<AnimatedPage><Dashboard /></AnimatedPage>} />
             <Route path="/users" element={<ProtectedRoute requiredPermission="users.read"><AnimatedPage><Users /></AnimatedPage></ProtectedRoute>} />

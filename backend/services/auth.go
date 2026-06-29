@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -45,6 +46,67 @@ func (s *AuthService) Login(req models.LoginRequest) (*models.LoginResponse, err
 	}
 
 	return &models.LoginResponse{Token: token, User: user}, nil
+}
+
+func (s *AuthService) Register(req models.RegisterRequest) (*models.LoginResponse, error) {
+	// Validate input
+	if strings.TrimSpace(req.Username) == "" {
+		return nil, errors.New("username is required")
+	}
+	if !emailRegex.MatchString(req.Email) {
+		return nil, errors.New("invalid email format")
+	}
+	if len(req.Password) < 6 {
+		return nil, errors.New("password must be at least 6 characters")
+	}
+
+	// Check if username already exists
+	existing, err := database.GetUserByUsername(req.Username)
+	if err == nil && existing.ID != "" {
+		return nil, errors.New("username already exists")
+	}
+
+	// Hash password
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, errors.New("failed to process password")
+	}
+
+	// Default role ID for regular users
+	defaultRoleID := "00000000-0000-0000-0000-000000000003"
+
+	// Insert new user
+	var u models.User
+	err = database.DB.QueryRow(`
+		INSERT INTO users (username, email, password, full_name, role_id, is_active)
+		VALUES ($1, $2, $3, $4, $5, true)
+		RETURNING id, username, email, full_name, avatar_url, provider, role_id, is_active, created_at, updated_at
+	`, req.Username, req.Email, string(hash), req.Username, defaultRoleID).Scan(
+		&u.ID, &u.Username, &u.Email, &u.FullName, &u.AvatarURL,
+		&u.Provider, &u.RoleID, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
+			return nil, errors.New("username or email already exists")
+		}
+		// User might have been created despite scan error - try login
+		if loginResp, loginErr := s.Login(models.LoginRequest{Username: req.Username, Password: req.Password}); loginErr == nil {
+			return loginResp, nil
+		}
+		return nil, errors.New("failed to create user")
+	}
+
+	// Fetch role
+	role, _ := database.GetRoleByID(u.RoleID)
+	u.Role = role
+
+	// Generate JWT token
+	token, err := s.generateToken(u)
+	if err != nil {
+		return nil, errors.New("failed to generate token")
+	}
+
+	return &models.LoginResponse{Token: token, User: u}, nil
 }
 
 func (s *AuthService) LoginOrCreateOAuth(provider, providerID, email, name, avatarURL string) (*models.LoginResponse, error) {

@@ -39,6 +39,29 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *AuthHandler) Register(c *gin.Context) {
+	var req models.RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	resp, err := h.svc.Register(req)
+	if err != nil {
+		status := http.StatusInternalServerError
+		msg := err.Error()
+		if msg == "username already exists" || msg == "username or email already exists" {
+			status = http.StatusConflict
+		} else if msg == "username is required" || msg == "invalid email format" || msg == "password must be at least 6 characters" {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": msg})
+		return
+	}
+
+	c.JSON(http.StatusCreated, resp)
+}
+
 func (h *AuthHandler) Me(c *gin.Context) {
 	userID, err := getUserID(c)
 	if err != nil {

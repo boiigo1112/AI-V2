@@ -32,15 +32,21 @@ func Setup(cfg *config.Config) *gin.Engine {
 	userSvc := services.NewUserService()
 	gameSvc := services.NewGameService(cfg.JWTSecret)
 	couponSvc := services.NewCouponService()
+	tenantSvc := services.NewTenantService()
+	backupSvc := services.NewBackupService()
+	validator := services.NewValidator(gameSvc)
+	auditSvc := services.NewAuditService()
 
 	ah := handlers.NewAuthHandler(authSvc, cfg)
 	uh := handlers.NewUserHandler(userSvc)
 	dh := handlers.NewDashboardHandler()
 	sh := handlers.NewSettingsHandler()
 	ih := handlers.NewInstallHandler(cfg.JWTSecret)
-	gh := handlers.NewGameHandler(gameSvc)
+	gh := handlers.NewGameHandler(gameSvc, backupSvc, validator, auditSvc)
 	ch := handlers.NewCouponHandler(couponSvc)
-	invh := handlers.NewInventoryHandler(gameSvc)
+	invh := handlers.NewInventoryHandler(gameSvc, backupSvc, validator, auditSvc)
+	th := handlers.NewTenantHandler(tenantSvc)
+	sah := handlers.NewSaasAdminHandler()
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -61,6 +67,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 		}
 
 		api.POST("/auth/login", middleware.RateLimit(loginLimiter), ah.Login)
+		api.POST("/auth/register", ah.Register)
 		api.GET("/auth/google", ah.GoogleLogin)
 		api.GET("/auth/google/callback", ah.GoogleCallback)
 		api.GET("/auth/github", ah.GithubLogin)
@@ -163,6 +170,35 @@ func Setup(cfg *config.Config) *gin.Engine {
 				coupon.DELETE("/:id", ch.DeleteCoupon)
 				coupon.GET("/:id/usage", ch.GetCouponUsage)
 				coupon.POST("/redeem", ch.RedeemCoupon)
+			}
+
+			// Tenant management routes (superadmin)
+			tenants := p.Group("/tenants")
+			tenants.Use(middleware.RequirePermission("tenants", "admin"))
+			{
+				tenants.GET("", th.ListTenants)
+				tenants.POST("", th.CreateTenant)
+				tenants.GET("/:id", th.GetTenant)
+				tenants.PUT("/:id", th.UpdateTenant)
+				tenants.DELETE("/:id", th.DeleteTenant)
+				tenants.GET("/:id/stats", th.GetTenantStats)
+			}
+
+			// Plan routes (authenticated users can list, superadmin can create)
+			plans := p.Group("/plans")
+			{
+				plans.GET("", th.ListPlans)
+				plans.POST("", middleware.RequirePermission("plans", "admin"), th.CreatePlan)
+			}
+
+			// SaaS admin dashboard (superadmin only)
+			saas := p.Group("/saas")
+			saas.Use(middleware.RequirePermission("saas", "admin"))
+			{
+				saas.GET("/stats", sah.Stats)
+				saas.GET("/tenants", sah.ListTenants)
+				saas.PUT("/tenants/:id/status", sah.UpdateTenantStatus)
+				saas.POST("/tenants/:id/extend", sah.ExtendTenantExpiry)
 			}
 		}
 	}

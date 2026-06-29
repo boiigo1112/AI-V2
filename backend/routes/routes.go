@@ -36,7 +36,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 	backupSvc := services.NewBackupService()
 	validator := services.NewValidator(gameSvc)
 	auditSvc := services.NewAuditService()
-
+	paymentSvc := services.NewPaymentService(tenantSvc)
+	subscriptionSvc := services.NewSubscriptionService()
 	ah := handlers.NewAuthHandler(authSvc, cfg)
 	uh := handlers.NewUserHandler(userSvc)
 	dh := handlers.NewDashboardHandler()
@@ -47,6 +48,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 	invh := handlers.NewInventoryHandler(gameSvc, backupSvc, validator, auditSvc)
 	th := handlers.NewTenantHandler(tenantSvc)
 	sah := handlers.NewSaasAdminHandler()
+	ph := handlers.NewPaymentHandler(paymentSvc)
+	sh2 := handlers.NewSubscriptionHandler(subscriptionSvc)
 
 	loginLimiter := middleware.NewRateLimiter(5, time.Minute)
 
@@ -189,6 +192,30 @@ func Setup(cfg *config.Config) *gin.Engine {
 			{
 				plans.GET("", th.ListPlans)
 				plans.POST("", middleware.RequirePermission("plans", "admin"), th.CreatePlan)
+			}
+
+			// Payment routes
+			payment := p.Group("/payment")
+			{
+				payment.POST("/create-invoice", ph.CreateInvoice)
+				payment.POST("/confirm", middleware.RequirePermission("payment", "admin"), ph.ConfirmPayment)
+				payment.GET("/invoices", ph.ListInvoices)
+				payment.GET("/invoices/:id", ph.GetInvoiceByID)
+				payment.GET("/configs", ph.GetPaymentConfigs)
+				payment.PUT("/configs", middleware.RequirePermission("payment", "admin"), ph.UpdatePaymentConfig)
+				payment.GET("/stats", middleware.RequirePermission("payment", "admin"), ph.GetRevenueStats)
+				payment.GET("/billing", ph.GetBillingHistory)
+			}
+
+			// Subscription routes
+			subscription := p.Group("/subscription")
+			{
+				subscription.POST("/activate", middleware.RequirePermission("subscription", "admin"), sh2.ActivateSubscription)
+				subscription.POST("/renew", sh2.RenewSubscription)
+				subscription.GET("/current", sh2.GetCurrentSubscription)
+				subscription.POST("/extend-trial", middleware.RequirePermission("subscription", "admin"), sh2.ExtendTrial)
+				subscription.GET("/expiring", middleware.RequirePermission("subscription", "admin"), sh2.ListExpiringSoon)
+				subscription.POST("/check-expiry", middleware.RequirePermission("subscription", "admin"), sh2.CheckExpiry)
 			}
 
 			// SaaS admin dashboard (superadmin only)

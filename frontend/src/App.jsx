@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import MainLayout from './layouts/MainLayout';
+import SaaSLayout from './layouts/SaaSLayout';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -26,6 +27,10 @@ import GameStatus from './pages/GameStatus';
 import BanManager from './pages/BanManager';
 import OnlineMap from './pages/OnlineMap';
 import Inventory from './pages/Inventory';
+import SaasDashboard from './pages/SaasDashboard';
+import SaasPlans from './pages/SaasPlans';
+import SaasCheckout from './pages/SaasCheckout';
+import SaasBilling from './pages/SaasBilling';
 
 function AnimatedPage({ children }) {
   return (
@@ -42,10 +47,13 @@ function App() {
     <AuthProvider>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
+          {/* Public */}
           <Route path="/" element={<Landing />} />
           <Route path="/register" element={<Register />} />
           <Route path="/install" element={<ErrorBoundary message="เกิดข้อผิดพลาดในขั้นตอนการติดตั้ง"><Install /></ErrorBoundary>} />
           <Route path="/login" element={<Login />} />
+
+          {/* Game Admin Panel (MainLayout with game sidebar) */}
           <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<AnimatedPage><Dashboard /></AnimatedPage>} />
             <Route path="/users" element={<ProtectedRoute requiredPermission="users.read"><AnimatedPage><Users /></AnimatedPage></ProtectedRoute>} />
@@ -65,6 +73,17 @@ function App() {
             <Route path="/game/status" element={<AnimatedPage><GameStatus /></AnimatedPage>} />
             <Route path="/game/ban-manager" element={<AnimatedPage><BanManager /></AnimatedPage>} />
           </Route>
+
+          {/* SaaS Admin Panel (SaaSLayout with dedicated sidebar - NO game items) */}
+          <Route element={<ProtectedRoute requiredPermission="saas.admin"><SaaSLayout /></ProtectedRoute>}>
+            <Route path="/saas/dashboard" element={<AnimatedPage><SaasDashboard /></AnimatedPage>} />
+            <Route path="/saas/plans" element={<AnimatedPage><SaasPlans /></AnimatedPage>} />
+            <Route path="/saas/checkout/:planId" element={<AnimatedPage><SaasCheckout /></AnimatedPage>} />
+            <Route path="/saas/billing" element={<AnimatedPage><SaasBilling /></AnimatedPage>} />
+          </Route>
+
+          {/* Redirects */}
+          <Route path="/saas" element={<Navigate to="/saas/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/install" replace />} />
         </Routes>
       </AnimatePresence>

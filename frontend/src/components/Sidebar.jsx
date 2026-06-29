@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, Zap, Gamepad2, ScrollText, ShoppingBag, Wifi, LogOut, Shield, Swords, ShieldCheck, Castle, PawPrint, Crosshair, Lock, TicketPlus, Ban, Globe, Backpack } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, Zap, Gamepad2, ScrollText, ShoppingBag, Wifi, LogOut, Shield, Swords, ShieldCheck, Castle, PawPrint, Crosshair, Lock, TicketPlus, Ban, Globe, Backpack, Building2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameStatus } from '@/hooks/use-game';
 import { cn } from '@/lib/utils';
@@ -111,6 +111,19 @@ function Sidebar() {
             })}
           </SidebarMenu>
         </SidebarGroup>
+
+        {/* SaaS Admin Button (Superadmin only) */}
+        {user?.permissions?.includes('saas.admin') && (
+          <div className="px-4 mb-2">
+            <NavLink
+              to="/saas/dashboard"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-gold/10 text-gold border border-gold/20 hover:bg-gold/15 transition-all"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>SaaS Admin Panel</span>
+            </NavLink>
+          </div>
+        )}
 
         {/* Game Status */}
         <div className="px-4 mt-auto">

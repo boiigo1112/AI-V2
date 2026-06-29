@@ -51,6 +51,16 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 		return
 	}
 
+	// Create trial subscription if no plan was specified
+	if req.PlanID == "" {
+		subSvc := services.NewSubscriptionService()
+		subSvc.ExtendTrial(tenant.ID, 14) // 14-day trial
+	}
+
+	// Create welcome invoice
+	paySvc := services.NewPaymentService(h.svc)
+	paySvc.CreateInvoice(tenant.ID, ownerID, req.PlanID, 1)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"tenant_id": tenant.ID,
 		"tenant":    tenant,

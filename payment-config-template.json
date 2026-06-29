@@ -1,0 +1,20 @@
+{
+  "promptpay": {
+    "method": "promptpay",
+    "label": "พร้อมเพย์ (PromptPay)",
+    "promptpay_id": "099-xxx-xxxx",
+    "account_name": "ชื่อเจ้าของบัญชี"
+  },
+  "scb": {
+    "method": "bank_scb",
+    "label": "ธนาคารไทยพาณิชย์ (SCB)",
+    "account_name": "ชื่อเจ้าของบัญชี",
+    "account_number": "xxx-x-xxxxx-x"
+  },
+  "kbank": {
+    "method": "bank_kbank",
+    "label": "ธนาคารกสิกรไทย (KBank)",
+    "account_name": "ชื่อเจ้าของบัญชี",
+    "account_number": "xxx-x-xxxxx-x"
+  }
+}

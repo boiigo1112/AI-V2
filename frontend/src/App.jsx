@@ -77,9 +77,11 @@ function App() {
           {/* SaaS Admin Panel (SaaSLayout with dedicated sidebar - NO game items) */}
           <Route element={<ProtectedRoute requiredPermission="saas.admin"><SaaSLayout /></ProtectedRoute>}>
             <Route path="/saas/dashboard" element={<AnimatedPage><SaasDashboard /></AnimatedPage>} />
+            <Route path="/saas/tenants" element={<AnimatedPage><SaasDashboard /></AnimatedPage>} />
             <Route path="/saas/plans" element={<AnimatedPage><SaasPlans /></AnimatedPage>} />
             <Route path="/saas/checkout/:planId" element={<AnimatedPage><SaasCheckout /></AnimatedPage>} />
             <Route path="/saas/billing" element={<AnimatedPage><SaasBilling /></AnimatedPage>} />
+            <Route path="/saas/settings" element={<AnimatedPage><SaasDashboard /></AnimatedPage>} />
           </Route>
 
           {/* Redirects */}

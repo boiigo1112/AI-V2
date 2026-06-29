@@ -33,7 +33,7 @@ function Header() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const { open, setOpen } = useSidebar();
+  const { open, setOpen, toggleSidebar, isMobile } = useSidebar();
   const [searchQuery, setSearchQuery] = useState('');
 
   const route = routeMap[location.pathname] || { title: 'Admin Panel', section: '' };
@@ -45,10 +45,10 @@ function Header() {
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={() => setOpen(!open)}
+          onClick={toggleSidebar}
           className="text-muted-foreground hover:text-foreground"
         >
-          {open ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+          {isMobile ? <PanelLeft className="w-4 h-4" /> : open ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
         </Button>
 
         <div className="flex flex-col">

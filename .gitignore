@@ -35,3 +35,10 @@ postgres-data/
 *.log
 /tmp/
 backend/blacken-server
+
+# Binaries
+*.tgz
+*.tar.gz
+cloudflared*
+ngrok*
+.env
